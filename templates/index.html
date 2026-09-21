@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Colegio InnovaEdu | Portal del Estudiante</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <!-- Cabecera Institucional -->
+    <header>
+      <div class="logo">
+        <i class="fa-solid fa-graduation-cap"></i> InnovaEdu
+      </div>
+      <nav>
+        <ul>
+          <li><a href="#">Conócenos</a></li>
+          <li><a href="#">Niveles</a></li>
+          <li><a href="#">Internacional</a></li>
+          <li><a href="#">Alumnos</a></li>
+          <li><a href="#">Blog</a></li>
+        </ul>
+      </nav>
+      <button class="btn-primary header-btn">Admisión</button>
+    </header>
+
+    <main>
+      <!-- CONTENEDOR PRINCIPAL (Visible al inicio) -->
+      <div id="home-container">
+        <!-- Banner Hero con Login Superpuesto -->
+        <section class="hero-section">
+          <div class="hero-content">
+            <h1>InnovaEdu desarrolla tecnología para el futuro</h1>
+            <p>
+              Investigación, innovación y educación de clase mundial para
+              nuestros estudiantes.
+            </p>
+            <button class="btn-outline-white">Conoce más</button>
+          </div>
+
+          <div class="hero-login">
+            <div class="login-card" id="login-section">
+              <h2 class="title-gradient">Portal del Estudiante</h2>
+
+              <form id="login-form">
+                <div class="input-group">
+                  <input
+                    type="text"
+                    id="codigo"
+                    required
+                    placeholder="Código de estudiante"
+                  />
+                </div>
+                <div class="input-group">
+                  <input
+                    type="password"
+                    id="password"
+                    required
+                    placeholder="Contraseña"
+                  />
+                </div>
+                <button type="submit" class="btn-primary">
+                  Iniciar sesión
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- Sección de Programas Académicos -->
+        <section class="programs-section">
+          <!-- Se cambió a title-gradient para mantener la paleta de colores -->
+          <h2
+            class="title-gradient"
+            style="font-size: 1.8rem; margin-bottom: 2rem"
+          >
+            Programas Académicos
+          </h2>
+          <div class="programs-grid">
+            <div class="program-pill">Educación Inicial</div>
+            <div class="program-pill">Educación Primaria</div>
+            <div class="program-pill">Educación Secundaria</div>
+            <div class="program-pill">Bachillerato Internacional</div>
+          </div>
+        </section>
+      </div>
+
+      <!-- SECCIÓN DEL DASHBOARD (Oculta al inicio) -->
+      <section id="dashboard-section" style="display: none; padding: 3rem 10%">
+        <div class="dashboard-content card">
+          <h2 id="welcome-msg" class="title-gradient">Bienvenido</h2>
+          <p>Aquí podrás ver tu información académica.</p>
+
+          <div class="info-box">
+            <h3><i class="fa-solid fa-chart-line"></i> Tu Rendimiento</h3>
+            <p>
+              Consulta el chatbot para obtener una predicción de tus notas o
+              revisar tus pagos pendientes.
+            </p>
+          </div>
+
+          <div class="upload-box">
+            <h3><i class="fa-solid fa-upload"></i> Subir Documentos</h3>
+            <p>Valida comprobantes de pago o tu DNI.</p>
+            <div class="upload-controls">
+              <input type="file" id="file-upload" accept="image/*" />
+              <button
+                class="btn-primary"
+                onclick="alert('Conectando con modelo de IA Visual...')"
+              >
+                Validar Imagen
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- WIDGET FLOTANTE DEL CHATBOT -->
+    <div id="chatbot-widget">
+      <div class="chatbot-window" id="chat-window">
+        <div class="chatbot-header">
+          <span><i class="fa-solid fa-robot"></i> Asistente Virtual</span>
+          <button id="close-chat"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="chatbot-messages" id="chat-messages"></div>
+
+        <div class="chatbot-input">
+          <button class="btn-icon" id="btn-mic" title="Hablar">
+            <i class="fa-solid fa-microphone"></i>
+          </button>
+          <input
+            type="text"
+            id="chat-input"
+            placeholder="Escribe o habla aquí..."
+          />
+          <button class="btn-icon btn-send" id="btn-send-chat">
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+
+      <button class="chatbot-toggle" id="open-chat">
+        <i class="fa-solid fa-comment-dots"></i>
+      </button>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+  </body>
+</html>

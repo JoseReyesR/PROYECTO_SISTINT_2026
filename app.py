@@ -30,7 +30,9 @@ except Exception as e:
 @app.route("/")
 def inicio():
     # Aquí conectaremos el HTML más adelante
-    return "<h1>¡Servidor Flask Activo!</h1><p>El Asistente Virtual Inteligente está en línea.</p>"
+    #return "<h1>¡Servidor Flask Activo!</h1><p>El Asistente Virtual Inteligente está en línea.</p>"
+    # Flask buscará automáticamente 'index.html' dentro de la carpeta 'templates'[cite: 5]
+    return render_template("index.html")
 
 @app.route("/notas", methods=["GET"])
 def notas():
