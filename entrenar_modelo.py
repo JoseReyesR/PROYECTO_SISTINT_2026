@@ -1,13 +1,13 @@
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
-import re
-# NUEVO: Importamos las librerías exigidas para partición de datos, regresión logística y evaluación
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
+import re
+# NUEVO: Importamos la librería para conversión de voz a texto
+import speech_recognition as sr 
 
-# 1. Creación del dataset simulado (Basado en requerimientos del SIAGIE)
-# MODIFICADO: Agregamos más ejemplos para que el modelo tenga suficientes datos al dividirse
+# 1. Dataset Simulado Ampliado
 datos_simulados = {
     'consulta': [
         '¿Cuál es mi horario de clases para este ciclo?',
@@ -16,51 +16,69 @@ datos_simulados = {
         'Quiero ver mi promedio de notas del curso de matemáticas',
         '¿A qué hora empiezan las clases el día lunes?',
         '¿Dónde pago la cuota de la matrícula?',
-        'Ayuda con el sistema de intranet, no puedo entrar', # NUEVO
-        '¿Cuándo inician las matrículas rezagadas?' # NUEVO
+        'Ayuda con el sistema de intranet, no puedo entrar', 
+        '¿Cuándo inician las matrículas rezagadas?',
+        'quiero pagar mi mensualidad', # NUEVO: Agregamos vocabulario de pagos
+        'dime mis notas' # NUEVO: Agregamos vocabulario de notas
     ],
-    'intencion': ['horario', 'pagos', 'matricula', 'notas', 'horario', 'pagos', 'soporte', 'matricula'] # MODIFICADO
+    'intencion': ['horario', 'pagos', 'matricula', 'notas', 'horario', 'pagos', 'soporte', 'matricula', 'pagos', 'notas'] 
 }
 df = pd.DataFrame(datos_simulados)
 
 # 2. Preprocesamiento de texto
 def limpiar_texto(texto):
-    texto = texto.lower() 
-    texto = re.sub(r'[^\w\s]', '', texto) 
-    return texto
+    texto = texto.lower()
+    return re.sub(r'[^\w\s]', '', texto) 
 
 df['consulta_limpia'] = df['consulta'].apply(limpiar_texto)
-# ELIMINADO: Se eliminaron los "print" de datos limpios para mantener la consola enfocada en los resultados del modelo
 
 # 3. Vectorización TF-IDF
 vectorizador = TfidfVectorizer()
-# MODIFICADO: Cambiamos el nombre de las variables a X e y (estándar en Machine Learning para "features" y "target")
 X = vectorizador.fit_transform(df['consulta_limpia'])
 y = df['intencion']
 
-# ELIMINADO: Se eliminaron los "print" de vocabulario y dimensiones de matriz
-
-# 4. Partición de datos exigida por el diseño experimental (Train/Test)
-# NUEVO: Dividimos el 70% de datos para entrenar el algoritmo y el 30% para probar su eficacia
+# 4. Partición de datos
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-# 5. Entrenamiento del Modelo de Regresión Logística
-# NUEVO: Creamos el modelo inteligente y lo entrenamos con los datos particionados
+# 5. Entrenamiento del Modelo
 modelo = LogisticRegression()
 modelo.fit(X_train, y_train)
 
-# 6. Evaluación del modelo con métricas de clasificación
-# NUEVO: Hacemos que el modelo clasifique los datos de prueba y mostramos su precisión
-y_pred = modelo.predict(X_test)
-print("--- Reporte de Clasificación en Datos de Prueba ---")
-print(classification_report(y_test, y_pred, zero_division=0))
+# ELIMINADO: Se eliminó el reporte de clasificación (classification_report) momentáneamente para enfocarnos en la prueba de voz.
+# ELIMINADO: Se eliminó la variable consulta_nueva con texto estático escrito a mano.
 
-# 7. Prueba en tiempo real con una consulta nueva
-# NUEVO: Simulamos que un estudiante real escribe en el chatbot
-consulta_nueva = ["hola, necesito pagar la mensualidad del colegio"]
-consulta_nueva_limpia = [limpiar_texto(consulta_nueva[0])]
-X_nueva = vectorizador.transform(consulta_nueva_limpia)
-prediccion = modelo.predict(X_nueva)
+# NUEVO: Función para capturar audio del micrófono y convertirlo a texto
+def escuchar_estudiante():
+    reconocedor = sr.Recognizer()
+    with sr.Microphone() as origen:
+        print("\n" + "="*50)
+        print("🎤 ESTOY ESCUCHANDO... (Habla ahora, ej: 'quiero pagar mi mensualidad')")
+        print("="*50)
+        # Ajusta el ruido de fondo y escucha
+        reconocedor.adjust_for_ambient_noise(origen)
+        audio = reconocedor.listen(origen)
+        
+        try:
+            print("⏳ Procesando voz a texto...")
+            # Convierte el audio a texto usando Google Speech Recognition
+            texto_transcrito = reconocedor.recognize_google(audio, language="es-PE")
+            return texto_transcrito
+        except sr.UnknownValueError:
+            print("❌ No pude entender el audio. Intenta hablar más claro.")
+            return None
+        except sr.RequestError:
+            print("❌ Error de conexión con el servicio de reconocimiento.")
+            return None
 
-print(f"\nConsulta del estudiante: '{consulta_nueva[0]}'")
-print(f"Intención detectada por la IA: {prediccion[0].upper()}")
+# MODIFICADO: Evaluamos la IA usando el texto que proviene del micrófono
+consulta_voz = escuchar_estudiante()
+
+if consulta_voz:
+    print(f"\n🗣️ Tú dijiste: '{consulta_voz}'")
+    
+    # Procesamos la voz transcrita pasándola por el mismo flujo NLP
+    consulta_limpia = [limpiar_texto(consulta_voz)]
+    X_nueva = vectorizador.transform(consulta_limpia)
+    prediccion = modelo.predict(X_nueva)
+    
+    print(f"🤖 Intención detectada por la IA: {prediccion[0].upper()}")
