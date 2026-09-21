@@ -17,7 +17,8 @@ if not os.path.exists(app.config["UPLOAD_FOLDER"]):
 
 # 1. Cargar el Modelo de Machine Learning exportado (Regresión Lineal)[cite: 3]
 try:
-    modelo_notas = joblib.load("modelo_notas.pkl")
+    # MODIFICADO: Se actualizó la ruta para que busque dentro de la carpeta 'modelos'
+    modelo_notas = joblib.load("modelos/modelo_notas.pkl") 
     print("✅ Modelo de Riesgo Académico cargado correctamente.")
 except Exception as e:
     print(f"⚠️ Error al cargar el modelo: {e}")
