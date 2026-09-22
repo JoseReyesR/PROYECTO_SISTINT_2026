@@ -1,35 +1,94 @@
 import joblib
+from conexion_sql import obtener_conexion
 
-# 1. Cargar los modelos NLP entrenados en memoria
-try:
-    modelo_nlp = joblib.load('modelos/modelo_chatbot.pkl')
-    vectorizador = joblib.load('modelos/vectorizer.pkl')
-    print("✅ Motor Conversacional NLP cargado correctamente.")
-except Exception as e:
-    print(f"⚠️ Error al cargar el modelo NLP: {e}")
+print("Cargando modelos NLP...")
+# Cargar los modelos previamente entrenados
+modelo_nlp = joblib.load("modelos/modelo_chatbot.pkl")
+vectorizador = joblib.load("modelos/vectorizer.pkl")
 
-def responder_chatbot(mensaje, id_estudiante="Estudiante"):
+def responder_chatbot(mensaje, id_estudiante):
     """
-    Procesa el mensaje del usuario, detecta la intención matemática y devuelve una respuesta estructurada.
+    Procesa el mensaje del estudiante, detecta la intención y consulta la BD.
     """
+    # 1. Identificación de la intención del usuario mediante NLP
+    texto_vectorizado = vectorizador.transform([mensaje])
+    intencion = modelo_nlp.predict(texto_vectorizado)[0]
+    
+    respuesta = ""
+    
+    # 2. Consulta de información en base de datos[cite: 3]
+    conexion = obtener_conexion()
+    if not conexion:
+        return {"respuesta": "Error de conexión a la base de datos."}
+        
+    cursor = conexion.cursor(dictionary=True)
+    
     try:
-        # Transformar el texto entrante a formato numérico (matriz TF-IDF)
-        X_mensaje = vectorizador.transform([mensaje.lower()])
-        
-        # Predecir la intención usando Regresión Logística[cite: 14]
-        intencion = modelo_nlp.predict(X_mensaje)[0]
-        
-        # Árbol de respuestas basado en la clasificación
+        # Generación de respuestas dinámicas[cite: 3]
         if intencion == "pagos":
-            return f"💰 {id_estudiante}, he detectado una consulta sobre pagos. Puedes revisar tu estado de cuenta detallado en la sección 'Tu Rendimiento' o acercarte a tesorería."
-        elif intencion == "horario":
-            return f"📅 Sobre tu horario: Las clases inician a las 8:00 AM. Recuerda revisar el portal para posibles cambios de aula."
-        elif intencion == "notas":
-            return "📊 Para ver tus notas detalladas y promedios, utiliza el panel de predicción de rendimiento en tu dashboard."
-        elif intencion == "tareas":
-            return "📚 Tienes tareas pendientes. Recuerda que la entrega oportuna impacta directamente en tu riesgo académico."
-        else:
-            return "🤔 Entiendo tu consulta, pero necesito más detalles. ¿Podrías reformularla usando otras palabras?"
+            query = "SELECT concepto, monto, estado FROM pagos WHERE id_estudiante = %s"
+            cursor.execute(query, (id_estudiante,))
+            deudas = cursor.fetchall()
             
+            if deudas:
+                respuesta = "💰 Tus pagos pendientes:\n"
+                for d in deudas:
+                    respuesta += f"- {d['concepto']} | S/ {d['monto']} | {d['estado']}\n"
+            else:
+                respuesta = "✅ No tienes pagos registrados o deudas pendientes."
+                
+        elif intencion == "horarios":
+            query = """
+                SELECT c.nombre, h.dia_semana, h.hora_inicio 
+                FROM horarios h
+                JOIN cursos c ON h.id_curso = c.id_curso
+                JOIN matriculas m ON c.id_curso = m.id_curso
+                WHERE m.id_estudiante = %s
+            """
+            cursor.execute(query, (id_estudiante,))
+            clases = cursor.fetchall()
+            
+            if clases:
+                respuesta = "📅 Tu horario semanal:\n"
+                for c in clases:
+                    respuesta += f"- {c['nombre']} | {c['dia_semana']} | {c['hora_inicio']}\n"
+            else:
+                respuesta = "No se encontraron horarios matriculados."
+
+        elif intencion == "notas":
+            query = "SELECT promedio_actual, tareas_entregadas, tareas_pendientes FROM dataset_rendimiento WHERE id_estudiante = %s"
+            cursor.execute(query, (id_estudiante,))
+            rendimiento = cursor.fetchone()
+            
+            if rendimiento:
+                respuesta = f"📊 Tu rendimiento académico:\n- Promedio actual: {rendimiento['promedio_actual']}\n- Tareas entregadas: {rendimiento['tareas_entregadas']}\n- Tareas pendientes: {rendimiento['tareas_pendientes']}"
+            else:
+                respuesta = "No hay notas registradas aún."
+        
+        else:
+            respuesta = "He detectado una consulta sobre tus tareas o cursos, pero aún estoy aprendiendo a mostrar esos detalles."
+
+        # 3. Registro del historial de consultas[cite: 3]
+        # Se guarda la interacción para tener memoria (Asumimos id_usuario = 1 temporalmente para el estudiante en el prototipo)
+        cursor.execute("""
+            INSERT INTO historial_consultas (id_usuario, id_intencion, mensaje_texto, modalidad) 
+            VALUES (1, (SELECT id_intencion FROM intenciones_nlp WHERE nombre_intencion = %s LIMIT 1), %s, 'Texto')
+        """, (intencion, mensaje))
+        conexion.commit()
+
     except Exception as e:
-        return "⚠️ Ocurrió un error al procesar tu mensaje. Intenta nuevamente."
+        respuesta = f"Hubo un error al procesar tu consulta: {e}"
+    finally:
+        cursor.close()
+        conexion.close()
+
+    return {"intencion": intencion, "respuesta": respuesta}
+
+# Prueba rápida
+if __name__ == "__main__":
+    # Simulamos que el estudiante con ID 1 pregunta por sus deudas
+    prueba_mensaje = "cuanto debo de pension"
+    resultado = responder_chatbot(prueba_mensaje, 1)
+    print(f"\nUsuario: {prueba_mensaje}")
+    print(f"Intención detectada: {resultado['intencion']}")
+    print(f"Chatbot responde:\n{resultado['respuesta']}")

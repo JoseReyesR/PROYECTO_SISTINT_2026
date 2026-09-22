@@ -2,7 +2,7 @@ import mysql.connector
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 import joblib
-
+import os
 def entrenar_modelo():
     print("🔄 Conectando a MySQL para extraer datos de rendimiento...")
     try:
@@ -46,8 +46,18 @@ def entrenar_modelo():
         modelo = LinearRegression()
         modelo.fit(X, y)
         
+        
+        # --- MODIFICACIÓN AQUÍ ---
+        # 1. Definir la carpeta y crearla si no existe
+        carpeta_modelos = "modelos"
+        if not os.path.exists(carpeta_modelos):
+            os.makedirs(carpeta_modelos)
+            
+        # 2. Definir la ruta completa
+        ruta_modelo = os.path.join(carpeta_modelos, 'modelo_notas.pkl')
+        
         # Guardamos el modelo entrenado
-        joblib.dump(modelo, 'modelo_notas.pkl')
+        joblib.dump(modelo, ruta_modelo)
         print("✅ ¡Modelo de notas entrenado y guardado exitosamente como 'modelo_notas.pkl'!")
         return modelo
 

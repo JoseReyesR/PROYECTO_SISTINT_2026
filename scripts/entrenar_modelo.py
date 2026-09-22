@@ -1,34 +1,55 @@
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-import joblib 
+import joblib
+import os
 
-# 1. Dataset de entrenamiento NLP (Consultas estudiantiles)
-consultas = [
-    ("quiero ver mis notas", "notas"), 
-    ("cuanto debo de pension", "pagos"), 
-    ("horario de clases", "horario"), 
-    ("tengo tareas pendientes", "tareas"),
-    ("cuando es el examen", "horario"), 
-    ("pagar mensualidad", "pagos"),
-    ("boleta de notas", "notas"), 
-    ("subir mi tarea", "tareas")
-] * 10  # Multiplicamos para generar volumen de entrenamiento
-df_nlp = pd.DataFrame(consultas, columns=["texto", "intencion"])
+def entrenar_chatbot_nlp():
+    print("🧠 Entrenando el modelo NLP del Chatbot...")
+    
+    # 1. Dataset de entrenamiento (Frases comunes de estudiantes)
+    # En un entorno de producción masivo, esto vendría de la base de datos, 
+    # pero para el prototipo usamos un corpus predefinido de intenciones.
+    datos = {
+        "texto": [
+            "quiero ver mis pagos", "cuanto debo", "tengo deudas pendientes", "estado de cuenta", "pagar pension",
+            "cual es mi horario", "a que hora me toca clases", "que curso tengo hoy", "ver mi horario", "clases de hoy",
+            "como voy en mis notas", "quiero ver mi promedio", "estoy jalando?", "cuales son mis calificaciones", "rendimiento academico",
+            "tengo tareas pendientes", "que tareas me faltan", "actividades pendientes", "deje alguna tarea", "entregas de cursos"
+        ],
+        "intencion": [
+            "pagos", "pagos", "pagos", "pagos", "pagos",
+            "horarios", "horarios", "horarios", "horarios", "horarios",
+            "notas", "notas", "notas", "notas", "notas",
+            "tareas", "tareas", "tareas", "tareas", "tareas"
+        ]
+    }
+    
+    df = pd.DataFrame(datos)
+    
+    # 2. Vectorización TF-IDF: Convierte el texto a números para que la IA lo entienda
+    vectorizador = TfidfVectorizer()
+    X = vectorizador.fit_transform(df['texto'])
+    y = df['intencion']
+    
+    # 3. Entrenamiento con Regresión Logística
+    modelo_nlp = LogisticRegression()
+    modelo_nlp.fit(X, y)
+    
+    # 4. Asegurarnos de guardar los archivos en la carpeta correcta
+    carpeta_modelos = "modelos"
+    if not os.path.exists(carpeta_modelos):
+        os.makedirs(carpeta_modelos)
+        
+    ruta_modelo = os.path.join(carpeta_modelos, "modelo_chatbot.pkl")
+    ruta_vectorizador = os.path.join(carpeta_modelos, "vectorizer.pkl")
+    
+    # 5. Exportar los archivos .pkl
+    joblib.dump(modelo_nlp, ruta_modelo)
+    joblib.dump(vectorizador, ruta_vectorizador)
+    
+    print(f"✅ ¡Modelo NLP entrenado con éxito!")
+    print(f"📁 Archivos generados: '{ruta_modelo}' y '{ruta_vectorizador}'")
 
-# 2. Vectorización TF-IDF (Transformar texto a números)
-vectorizador = TfidfVectorizer()
-X = vectorizador.fit_transform(df_nlp['texto'])
-y = df_nlp['intencion']
-
-# 3. Entrenamiento del Modelo de Clasificación (Regresión Logística)
-modelo_nlp = LogisticRegression()
-modelo_nlp.fit(X, y)
-
-# 4. Exportación de los archivos .pkl
-# Al ejecutar desde la raíz del proyecto, apuntamos directamente a la carpeta 'modelos'
-joblib.dump(modelo_nlp, 'modelos/modelo_chatbot.pkl')
-joblib.dump(vectorizador, 'modelos/vectorizer.pkl')
-
-print("✅ Entrenamiento NLP finalizado.")
-print("Archivos 'modelo_chatbot.pkl' y 'vectorizer.pkl' generados en la carpeta 'modelos'.")
+if __name__ == "__main__":
+    entrenar_chatbot_nlp()
