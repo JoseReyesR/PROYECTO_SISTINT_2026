@@ -13,20 +13,53 @@ document.addEventListener("DOMContentLoaded", () => {
     const chatInput = document.getElementById('chat-input');
     const btnSendChat = document.getElementById('btn-send-chat');
 
-    // 1. Simulación de Login
-    loginForm.addEventListener('submit', (e) => {
+    // ==========================================
+    // 1. [MODIFICADO] LÓGICA REAL DE LOGIN 
+    // ==========================================
+    loginForm.addEventListener('submit', async (e) => { // [MODIFICADO] Convertido a función asíncrona
         e.preventDefault();
         const codigo = document.getElementById('codigo').value;
         
-        // Ocultar el contenedor principal completo y mostrar dashboard
-        document.getElementById('home-container').style.display = 'none';
-        dashboardSection.style.display = 'block';
-        document.getElementById('welcome-msg').innerText = `Hola, estudiante ${codigo}`;
+        // [NUEVO] Obtenemos la contraseña del formulario (asegúrate de que el input tenga id="password")
+        // Si en tu HTML no le pusiste ID, usa temporalmente "1234"
+        const passwordInput = document.getElementById('password');
+        const password = passwordInput ? passwordInput.value : "1234"; 
         
-        // Mensaje inicial del bot
-        setTimeout(() => {
-            addMessage(`¡Hola! Ya iniciaste sesión. ¿En qué te ayudo hoy?`, 'bot');
-        }, 500);
+        // [NUEVO] Petición real al backend (Flask) para iniciar sesión
+        try {
+            const formData = new FormData();
+            formData.append('codigo', codigo);
+            formData.append('password', password);
+
+            const response = await fetch('/login', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+
+            if (data.ok) {
+                // Ocultar el contenedor principal y mostrar dashboard solo si Flask lo aprueba
+                document.getElementById('home-container').style.display = 'none';
+                dashboardSection.style.display = 'block';
+                document.getElementById('welcome-msg').innerText = `Hola, estudiante ${data.nombre}`;
+                
+                // [NUEVO] Consumimos el modelo de Perfilamiento para un saludo personalizado
+                const respBienvenida = await fetch('/bienvenida', { credentials: 'same-origin' });
+                const dataBienvenida = await respBienvenida.json();
+
+                // Mensaje inicial del bot
+                setTimeout(() => {
+                    addMessage(dataBienvenida.mensaje || `¡Hola! Ya iniciaste sesión. ¿En qué te ayudo hoy?`, 'bot');
+                }, 500);
+            } else {
+                // [NUEVO] Muestra alerta si la contraseña o usuario son incorrectos
+                alert(data.mensaje); 
+            }
+        } catch (error) {
+            console.error("Error en el login:", error);
+            alert("Error conectando con el servidor Flask.");
+        }
     });
 
     // 2. Abrir / Cerrar el Widget del Chat
@@ -64,14 +97,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin', // ¡Esto ya lo tenías bien! Mantiene viva la sesión
                     body: JSON.stringify({ mensaje: text })
                 });
                 
                 const data = await response.json();
                 
                 document.getElementById(loadingId).remove();
-                if (data.respuesta) {
+                
+                // [MODIFICADO] Mejor manejo de errores por si la sesión expira
+                if (response.ok && data.respuesta) {
                     addMessage(data.respuesta, 'bot');
+                } else if (data.respuesta) {
+                    addMessage(data.respuesta, 'bot'); // Mostrará "La sesión expiró"
                 } else {
                     addMessage("Error de conexión con la IA.", 'bot');
                 }
@@ -87,7 +125,6 @@ document.addEventListener("DOMContentLoaded", () => {
             btnSendChat.click();
         }
     });
-
 
     // ==========================================
     // CAPACIDAD MULTIMODAL: SPEECH-TO-TEXT
@@ -131,12 +168,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-
     // ==========================================
     // CAPACIDAD MULTIMODAL: SUBIDA DE IMÁGENES
     // ==========================================
     const fileUpload = document.getElementById('file-upload');
-    // Nota: Asegúrate de que en tu index.html el botón diga id="btn-upload" en lugar del onclick actual
     const btnUpload = document.getElementById('btn-upload'); 
 
     if (btnUpload) {
@@ -159,13 +194,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Petición al backend Flask
                 const response = await fetch('/subir_imagen', {
                     method: 'POST',
+                    credentials: 'same-origin', // [NUEVO] Obligatorio para que Flask no bloquee la subida
                     body: formData
                 });
                 
                 const data = await response.json();
                 
-                // Mostrar resultado de la IA Visual
-                alert(data.mensaje);
+                if(response.ok) {
+                    alert(data.mensaje || "Imagen procesada");
+                } else {
+                    alert(data.error || "Error procesando la imagen");
+                }
                 
             } catch (error) {
                 console.error(error);
