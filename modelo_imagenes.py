@@ -1,38 +1,43 @@
-from PIL import Image
-import pytesseract
 import os
-# Este archivo actuará como una dependencia para tu servidor web. De acuerdo con tu diseño, 
-# cuando el estudiante suba una imagen desde la interfaz, tu archivo app.py la guardará mediante secure_filename
-# Descomenta y ajusta esta línea si instalaste Tesseract en la ruta por defecto de Windows
-# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+import pytesseract
+from PIL import Image
+from dotenv import load_dotenv
 
-def analizar_pagina_web(ruta_imagen):
+# 1. Cargar las variables de entorno locales (el archivo .env)
+load_dotenv()
+
+# 2. Configurar Tesseract de forma dinámica
+# Si un compañero usa Windows y puso la ruta en su .env, la tomará.
+# Si usa Mac/Linux, la variable estará vacía y usará la ruta del sistema por defecto.
+tesseract_path = os.getenv("TESSERACT_PATH")
+if tesseract_path:
+    pytesseract.pytesseract.tesseract_cmd = tesseract_path
+
+def analizar_documento(ruta_imagen):
     """
-    Realiza la extracción de características visuales y validación de formatos (DNI o vouchers).
+    Extrae texto de una imagen y realiza validación básica de formatos (DNI/Voucher).
     """
-    # Verificamos que el archivo realmente exista antes de procesarlo
-    if not os.path.exists(ruta_imagen):
-        return "Error: No se encontró la imagen en la ruta especificada."
-        
     try:
-        # 1. Preparación de datos visuales
-        imagen = Image.open(ruta_imagen)
+        # Abrir la imagen subida
+        img = Image.open(ruta_imagen)
         
-        # 2. Extracción de características mediante OCR
-        texto_extraido = pytesseract.image_to_string(imagen).lower()
-        
-        # 3. Clasificación básica para validación de formatos
-        if "dni" in texto_extraido or "reniec" in texto_extraido:
-            return "Validación exitosa: Documento de Identidad (DNI) detectado."
-        elif "voucher" in texto_extraido or "bcp" in texto_extraido or "pago" in texto_extraido or "transferencia" in texto_extraido:
-            return "Validación exitosa: Comprobante de pago (Voucher) detectado."
+        # Extraer texto usando Tesseract en español
+       # texto_extraido = pytesseract.image_to_string(img, lang="spa").lower()
+        texto_extraido = pytesseract.image_to_string(img).lower()
+        # Validación
+        if "dni" in texto_extraido or "documento" in texto_extraido:
+            return {"valido": True, "tipo": "DNI", "mensaje": "✅ Documento de identidad validado correctamente."}
+        elif "banco" in texto_extraido or "voucher" in texto_extraido or "pago" in texto_extraido:
+            return {"valido": True, "tipo": "Voucher", "mensaje": "✅ Comprobante de pago validado correctamente."}
         else:
-            return "Alerta: La imagen cargada no cumple con la estructura de un DNI o Voucher académico."
+            return {"valido": False, "tipo": "Desconocido", "mensaje": "⚠️ No detectamos palabras clave. Asegúrate de que la imagen sea nítida."}
             
     except Exception as e:
-        return f"Error en el procesamiento de la imagen: {str(e)}"
+        return {"valido": False, "tipo": "Error", "mensaje": f"❌ Error en el OCR: {str(e)}"}
 
-# Prueba local rápida (Solo se ejecuta si corres este archivo directamente)
+# 3. Función de prueba rápida para tus compañeros
 if __name__ == "__main__":
-    print("--- Módulo de IA Visual Listo ---")
-    print("Esperando la conexión desde app.py para procesar rutas de imágenes...")
+    print("Iniciando prueba local de Tesseract OCR...")
+    print(f"Ruta configurada: {tesseract_path if tesseract_path else 'Por defecto del sistema'}")
+    # Puedes colocar una imagen de prueba llamada 'prueba.jpg' en tu raíz para probar este script directamente
+    # print(analizar_documento("prueba.jpg"))

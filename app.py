@@ -4,25 +4,29 @@ import mysql.connector
 import joblib
 import os
 
-# Importamos la función de tu script de IA Visual
-from modelo_imagenes import analizar_pagina_web 
+# Importamos las funciones de tus scripts de IA
+from modelo_imagenes import analizar_documento
 from chatbot import responder_chatbot
 
 app = Flask(__name__)
 app.secret_key = "clave_super_secreta"
-app.config["UPLOAD_FOLDER"] = "static/uploads"
+
+# Configuración centralizada para subida de archivos
+UPLOAD_FOLDER = "static/uploads"
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 # Aseguramos que exista la carpeta para guardar las imágenes temporales
 if not os.path.exists(app.config["UPLOAD_FOLDER"]):
     os.makedirs(app.config["UPLOAD_FOLDER"])
 
-# 1. Cargar el Modelo de Machine Learning exportado (Regresión Lineal)[cite: 3]
+# 1. Cargar el Modelo de Machine Learning exportado (Regresión Lineal)
 try:
-    # MODIFICADO: Se actualizó la ruta para que busque dentro de la carpeta 'modelos'
+    # Busca dentro de la carpeta 'modelos'
     modelo_notas = joblib.load("modelos/modelo_notas.pkl") 
     print("✅ Modelo de Riesgo Académico cargado correctamente.")
 except Exception as e:
-    print(f"⚠️ Error al cargar el modelo: {e}")
+    modelo_notas = None
+    print(f"⚠️ Error al cargar el modelo de notas: {e}")
 
 # ==========================================
 # RUTAS WEB DEL SISTEMA
@@ -30,15 +34,13 @@ except Exception as e:
 
 @app.route("/")
 def inicio():
-    # Aquí conectaremos el HTML más adelante
-    #return "<h1>¡Servidor Flask Activo!</h1><p>El Asistente Virtual Inteligente está en línea.</p>"
-    # Flask buscará automáticamente 'index.html' dentro de la carpeta 'templates'[cite: 5]
+    # Flask buscará automáticamente 'index.html' dentro de la carpeta 'templates'
     return render_template("index.html")
 
 @app.route("/notas", methods=["GET"])
 def notas():
     """
-    Ruta para predecir el riesgo académico usando el modelo de Regresión Lineal[cite: 3].
+    Ruta para predecir el riesgo académico usando el modelo de Regresión Lineal.
     """
     import pandas as pd
     # Simulación temporal de datos de un estudiante para probar el endpoint
@@ -53,32 +55,6 @@ def notas():
         })
     return jsonify({"error": "Modelo predictivo no disponible."})
 
-@app.route("/subir_imagen", methods=["POST"])
-def subir_imagen():
-    """
-    Ruta para recibir vouchers o DNI y procesarlos con IA Visual[cite: 3].
-    """
-    if "imagen" not in request.files:
-        return jsonify({"error": "No se envió ninguna imagen."})
-        
-    archivo = request.files["imagen"]
-    if archivo.filename == "":
-        return jsonify({"error": "Archivo vacío."})
-    
-    # Guardado seguro del archivo[cite: 3]
-    nombre_seguro = secure_filename(archivo.filename)
-    ruta = os.path.join(app.config["UPLOAD_FOLDER"], nombre_seguro)
-    archivo.save(ruta)
-    
-    # Análisis con tu script modelo_imagenes.py[cite: 3]
-    resultado_ia = analizar_pagina_web(ruta)
-    
-    return jsonify({
-        "archivo_recibido": nombre_seguro,
-        "analisis_visual": resultado_ia
-    })
-    
-    
 @app.route("/chat", methods=["POST"])
 def chat():
     """
@@ -90,15 +66,36 @@ def chat():
         
     mensaje_usuario = datos["mensaje"]
     
-    # Aquí podríamos extraer el código del alumno desde session["id_estudiante"], 
-    # pero para esta prueba usaremos un valor por defecto.
+    # Procesamos la intención usando tu motor NLP
     respuesta_ia = responder_chatbot(mensaje_usuario)
     
     return jsonify({
         "respuesta": respuesta_ia
     })
 
+@app.route("/subir_imagen", methods=["POST"])
+def subir_imagen():
+    """
+    Ruta unificada para recibir vouchers o DNI y procesarlos con IA Visual (Tesseract OCR).
+    """
+    if "imagen" not in request.files:
+        return jsonify({"error": "No se envió ninguna imagen.", "valido": False}), 400
+        
+    archivo = request.files["imagen"]
+    
+    if archivo.filename == "":
+        return jsonify({"error": "Archivo vacío.", "valido": False}), 400
+    
+    # Guardado seguro del archivo
+    nombre_seguro = secure_filename(archivo.filename)
+    ruta = os.path.join(app.config["UPLOAD_FOLDER"], nombre_seguro)
+    archivo.save(ruta)
+    
+    # Análisis visual con tu script modelo_imagenes.py
+    resultado_ia = analizar_documento(ruta)
+    
+    # Devolvemos directamente el resultado de la función analizar_documento (que ya es un diccionario)
+    return jsonify(resultado_ia)
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
-    
-    

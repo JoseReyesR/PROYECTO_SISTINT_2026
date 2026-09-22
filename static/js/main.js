@@ -3,7 +3,6 @@
 document.addEventListener("DOMContentLoaded", () => {
     // Referencias del DOM
     const loginForm = document.getElementById('login-form');
-    const loginSection = document.getElementById('login-section');
     const dashboardSection = document.getElementById('dashboard-section');
     
     // Referencias del Chatbot
@@ -19,14 +18,12 @@ document.addEventListener("DOMContentLoaded", () => {
         e.preventDefault();
         const codigo = document.getElementById('codigo').value;
         
-        // Ocultar login y mostrar dashboard
-       // loginSection.style.display = 'none';
-       // Ocultar el contenedor principal completo y mostrar dashboard
+        // Ocultar el contenedor principal completo y mostrar dashboard
         document.getElementById('home-container').style.display = 'none';
         dashboardSection.style.display = 'block';
         document.getElementById('welcome-msg').innerText = `Hola, estudiante ${codigo}`;
         
-        // Si el chat estaba abierto, lo podemos dejar abierto, o mostrar un mensaje inicial
+        // Mensaje inicial del bot
         setTimeout(() => {
             addMessage(`¡Hola! Ya iniciaste sesión. ¿En qué te ayudo hoy?`, 'bot');
         }, 500);
@@ -35,21 +32,21 @@ document.addEventListener("DOMContentLoaded", () => {
     // 2. Abrir / Cerrar el Widget del Chat
     btnOpenChat.addEventListener('click', () => {
         chatWindow.style.display = 'flex';
-        btnOpenChat.style.display = 'none'; // Oculta el botón redondo
+        btnOpenChat.style.display = 'none';
     });
 
     btnCloseChat.addEventListener('click', () => {
         chatWindow.style.display = 'none';
-        btnOpenChat.style.display = 'flex'; // Muestra el botón redondo
+        btnOpenChat.style.display = 'flex';
     });
 
-    // 3. Lógica para enviar mensajes
+    // 3. Lógica para enviar mensajes (Texto)
     function addMessage(text, sender) {
         const msgDiv = document.createElement('div');
         msgDiv.classList.add('message', sender);
         msgDiv.innerHTML = text;
         chatMessages.appendChild(msgDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight; // Auto-scroll hacia abajo
+        chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
     btnSendChat.addEventListener('click', async () => {
@@ -58,13 +55,12 @@ document.addEventListener("DOMContentLoaded", () => {
             addMessage(text, 'user');
             chatInput.value = '';
             
-            // Agregamos un indicador de "escribiendo..."
+            // Indicador de carga
             const loadingId = 'loading-' + Date.now();
             addMessage('<i class="fa-solid fa-ellipsis"></i>', 'bot');
             chatMessages.lastChild.id = loadingId;
 
             try {
-                // Conexión real con el backend Flask (Ruta NLP)
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -73,7 +69,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 const data = await response.json();
                 
-                // Remover indicador de carga y mostrar respuesta de la IA
                 document.getElementById(loadingId).remove();
                 if (data.respuesta) {
                     addMessage(data.respuesta, 'bot');
@@ -87,7 +82,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Permitir envío con la tecla Enter
     chatInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             btnSendChat.click();
@@ -99,36 +93,29 @@ document.addEventListener("DOMContentLoaded", () => {
     // CAPACIDAD MULTIMODAL: SPEECH-TO-TEXT
     // ==========================================
     const btnMic = document.getElementById('btn-mic');
-    
-    // Verificamos si el navegador soporta el reconocimiento de voz
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
     if (SpeechRecognition) {
         const recognition = new SpeechRecognition();
-        recognition.lang = 'es-PE'; // Español de Perú
+        recognition.lang = 'es-PE';
         recognition.continuous = false;
         recognition.interimResults = false;
 
         btnMic.addEventListener('click', () => {
-            // Cambiamos el estilo visual para indicar que está grabando
             btnMic.style.backgroundColor = '#EEF2FF';
             btnMic.style.color = '#5A67D8';
             chatInput.placeholder = "Escuchando...";
-            
             recognition.start();
         });
 
         recognition.onresult = (event) => {
-            // Capturamos el texto transcrito
             const transcript = event.results[0][0].transcript;
             chatInput.value = transcript;
             
-            // Restauramos el estilo del botón
             btnMic.style.backgroundColor = 'transparent';
             btnMic.style.color = '#64748B';
             chatInput.placeholder = "Escribe o habla aquí...";
             
-            // Simulamos el clic en enviar automáticamente
             btnSendChat.click();
         };
 
@@ -141,6 +128,54 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
         btnMic.addEventListener('click', () => {
             alert("Tu navegador no soporta el reconocimiento de voz. Por favor, usa Google Chrome.");
+        });
+    }
+
+
+    // ==========================================
+    // CAPACIDAD MULTIMODAL: SUBIDA DE IMÁGENES
+    // ==========================================
+    const fileUpload = document.getElementById('file-upload');
+    // Nota: Asegúrate de que en tu index.html el botón diga id="btn-upload" en lugar del onclick actual
+    const btnUpload = document.getElementById('btn-upload'); 
+
+    if (btnUpload) {
+        btnUpload.addEventListener('click', async () => {
+            const file = fileUpload.files[0];
+            
+            if (!file) {
+                alert("Por favor, selecciona una imagen primero.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("imagen", file);
+
+            // Cambiar estado del botón mientras procesa
+            btnUpload.innerText = "Procesando...";
+            btnUpload.disabled = true;
+
+            try {
+                // Petición al backend Flask
+                const response = await fetch('/subir_imagen', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                // Mostrar resultado de la IA Visual
+                alert(data.mensaje);
+                
+            } catch (error) {
+                console.error(error);
+                alert("Error de conexión al servidor. Revisa si Flask está corriendo.");
+            } finally {
+                // Restaurar botón e input
+                btnUpload.innerText = "Validar Imagen";
+                btnUpload.disabled = false;
+                fileUpload.value = '';
+            }
         });
     }
 });
