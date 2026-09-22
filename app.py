@@ -6,6 +6,7 @@ import os
 
 # Importamos la función de tu script de IA Visual
 from modelo_imagenes import analizar_pagina_web 
+from chatbot import responder_chatbot
 
 app = Flask(__name__)
 app.secret_key = "clave_super_secreta"
@@ -76,6 +77,28 @@ def subir_imagen():
         "archivo_recibido": nombre_seguro,
         "analisis_visual": resultado_ia
     })
+    
+    
+@app.route("/chat", methods=["POST"])
+def chat():
+    """
+    Endpoint que recibe el texto del frontend (escrito o dictado por voz) y lo procesa con la IA.
+    """
+    datos = request.get_json()
+    if not datos or "mensaje" not in datos:
+        return jsonify({"error": "No se recibió ningún mensaje."}), 400
+        
+    mensaje_usuario = datos["mensaje"]
+    
+    # Aquí podríamos extraer el código del alumno desde session["id_estudiante"], 
+    # pero para esta prueba usaremos un valor por defecto.
+    respuesta_ia = responder_chatbot(mensaje_usuario)
+    
+    return jsonify({
+        "respuesta": respuesta_ia
+    })
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
+    
+    

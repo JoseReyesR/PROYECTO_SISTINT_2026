@@ -52,16 +52,38 @@ document.addEventListener("DOMContentLoaded", () => {
         chatMessages.scrollTop = chatMessages.scrollHeight; // Auto-scroll hacia abajo
     }
 
-    btnSendChat.addEventListener('click', () => {
+    btnSendChat.addEventListener('click', async () => {
         const text = chatInput.value.trim();
         if (text) {
             addMessage(text, 'user');
             chatInput.value = '';
             
-            // Simulación de respuesta de la IA
-            setTimeout(() => {
-                addMessage("Estoy procesando tu solicitud...", 'bot');
-            }, 800);
+            // Agregamos un indicador de "escribiendo..."
+            const loadingId = 'loading-' + Date.now();
+            addMessage('<i class="fa-solid fa-ellipsis"></i>', 'bot');
+            chatMessages.lastChild.id = loadingId;
+
+            try {
+                // Conexión real con el backend Flask (Ruta NLP)
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mensaje: text })
+                });
+                
+                const data = await response.json();
+                
+                // Remover indicador de carga y mostrar respuesta de la IA
+                document.getElementById(loadingId).remove();
+                if (data.respuesta) {
+                    addMessage(data.respuesta, 'bot');
+                } else {
+                    addMessage("Error de conexión con la IA.", 'bot');
+                }
+            } catch (error) {
+                document.getElementById(loadingId).remove();
+                addMessage("Servidor fuera de línea.", 'bot');
+            }
         }
     });
 
