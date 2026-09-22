@@ -93,4 +93,54 @@ document.addEventListener("DOMContentLoaded", () => {
             btnSendChat.click();
         }
     });
+
+
+    // ==========================================
+    // CAPACIDAD MULTIMODAL: SPEECH-TO-TEXT
+    // ==========================================
+    const btnMic = document.getElementById('btn-mic');
+    
+    // Verificamos si el navegador soporta el reconocimiento de voz
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'es-PE'; // Español de Perú
+        recognition.continuous = false;
+        recognition.interimResults = false;
+
+        btnMic.addEventListener('click', () => {
+            // Cambiamos el estilo visual para indicar que está grabando
+            btnMic.style.backgroundColor = '#EEF2FF';
+            btnMic.style.color = '#5A67D8';
+            chatInput.placeholder = "Escuchando...";
+            
+            recognition.start();
+        });
+
+        recognition.onresult = (event) => {
+            // Capturamos el texto transcrito
+            const transcript = event.results[0][0].transcript;
+            chatInput.value = transcript;
+            
+            // Restauramos el estilo del botón
+            btnMic.style.backgroundColor = 'transparent';
+            btnMic.style.color = '#64748B';
+            chatInput.placeholder = "Escribe o habla aquí...";
+            
+            // Simulamos el clic en enviar automáticamente
+            btnSendChat.click();
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Error en el micrófono: ", event.error);
+            btnMic.style.backgroundColor = 'transparent';
+            btnMic.style.color = '#64748B';
+            chatInput.placeholder = "Error al escuchar. Intenta de nuevo.";
+        };
+    } else {
+        btnMic.addEventListener('click', () => {
+            alert("Tu navegador no soporta el reconocimiento de voz. Por favor, usa Google Chrome.");
+        });
+    }
 });
