@@ -3,22 +3,21 @@ from werkzeug.utils import secure_filename
 import mysql.connector
 import joblib
 import os
-import pandas as pd # [NUEVO] Necesario para pasarle datos de la BD a los modelos
+import pandas as pd # Necesario para pasarle datos de la BD a los modelos
 
 # Importamos las funciones de tus scripts de IA
 from modelo_imagenes import analizar_documento
 from chatbot import responder_chatbot
-from conexion_sql import obtener_conexion # [NUEVO] Importamos la conexión a BD
+from conexion_sql import obtener_conexion # Importamos la conexión a BD
 
 app = Flask(__name__)
 app.secret_key = "clave_super_secreta"
 
 # ==========================================
-# [NUEVO] CONFIGURACIÓN DE SESIONES Y LOGIN
+# CONFIGURACIÓN DE SESIONES Y LOGIN
 # ==========================================
 app.config['SESSION_COOKIE_SAMESITE'] = "Lax"
 app.config['SESSION_COOKIE_SECURE'] = False
-PASSWORD_DEMO = "1234" # Contraseña general para el prototipo
 
 # Configuración centralizada para subida de archivos
 UPLOAD_FOLDER = "static/uploads"
@@ -29,7 +28,7 @@ if not os.path.exists(app.config["UPLOAD_FOLDER"]):
     os.makedirs(app.config["UPLOAD_FOLDER"])
 
 # ==========================================
-# [MODIFICADO] CARGA DE MÚLTIPLES MODELOS ML
+# CARGA DE MÚLTIPLES MODELOS ML
 # ==========================================
 try:
     modelo_notas = joblib.load("modelos/modelo_notas.pkl") 
@@ -39,7 +38,6 @@ except Exception as e:
     print(f"⚠️ Error al cargar el modelo de notas: {e}")
 
 try:
-    # [NUEVO] Cargamos el modelo de perfilamiento que recién creaste
     modelo_perfil = joblib.load("modelos/modelo_perfil_usuario.pkl")
     print("✅ Modelo de Perfilamiento cargado correctamente.")
 except Exception as e:
@@ -47,11 +45,11 @@ except Exception as e:
     print(f"⚠️ Error al cargar el modelo de perfilamiento: {e}")
 
 # ==========================================
-# [NUEVO] FUNCIÓN AUXILIAR DE SEGURIDAD
+# FUNCIÓN AUXILIAR DE SEGURIDAD
 # ==========================================
 def logueado():
-    """Verifica si un estudiante ha iniciado sesión"""
-    return "id_estudiante" in session
+    """Verifica si CUALQUIER usuario (padre, profe, estudiante) ha iniciado sesión"""
+    return "nombre" in session
 
 # ==========================================
 # RUTAS WEB DEL SISTEMA
@@ -59,16 +57,16 @@ def logueado():
 
 @app.route("/")
 def inicio():
-    # [NUEVO] Destruye cualquier sesión activa al recargar la página (F5)
+    # Destruye cualquier sesión activa al recargar la página (F5)
     session.clear()
-    # Flask buscará automáticamente 'index.html' dentro de la carpeta 'templates'
     return render_template("index.html")
 
-# [NUEVO] RUTA DE LOGIN
-# [MODIFICADO] RUTA DE LOGIN REAL
-# [MODIFICADO] RUTA DE LOGIN UNIVERSAL
+# ==========================================
+# RUTA DE LOGIN UNIVERSAL
+# ==========================================
 @app.route("/login", methods=["POST"])
 def login():
+    """Valida las credenciales reales contra la base de datos permitiendo múltiples roles"""
     codigo_o_usuario = request.form.get("codigo") # Puede recibir "EST-001" o "padre_familia1"
     password = request.form.get("password")
 
@@ -96,41 +94,22 @@ def login():
         "nombre": session["nombre"],
         "rol": usuario['rol_id']
     })
-    """Valida las credenciales reales contra la base de datos"""
-    codigo = request.form.get("codigo")
-    password = request.form.get("password")
 
-    # Importa la nueva función desde conexion_sql (asegúrate de actualizar el import arriba)
-    from conexion_sql import obtener_estudiante_login
-    
-    # Validamos enviando tanto el código como el password a MySQL
-    estudiante = obtener_estudiante_login(codigo, password)
-
-    if estudiante is None:
-        return jsonify({"ok": False, "mensaje": "Código no encontrado o contraseña incorrecta"})
-
-    # Guardamos los datos en la memoria segura del servidor
-    session["id_estudiante"] = estudiante['id_estudiante']
-    session["nombre"] = estudiante['codigo_anonimizado']
-
-    return jsonify({
-        "ok": True,
-        "nombre": estudiante['codigo_anonimizado']
-    })
-
-# [NUEVO] RUTA DE BIENVENIDA CON INTELIGENCIA ARTIFICIAL
+# ==========================================
+# RUTA DE BIENVENIDA CON INTELIGENCIA ARTIFICIAL
+# ==========================================
 @app.route("/bienvenida", methods=["GET"])
 def bienvenida():
-    """Genera un saludo adaptativo basado en el perfil predictivo del alumno"""
+    """Genera un saludo adaptativo basado en el perfil del usuario (Estudiante o General)"""
     if not logueado():
         return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
 
     nombre = session["nombre"]
-    id_estudiante = session["id_estudiante"]
-    interes = "horario" # Valor por defecto
+    id_estudiante = session.get("id_estudiante") # Puede ser None si es un padre o profesor
+    interes = "institucional" # Valor por defecto para no estudiantes
     
-    # Predecimos el perfil usando datos reales de la BD
-    if modelo_perfil:
+    # Predecimos el perfil usando datos reales SOLO si es un estudiante
+    if id_estudiante and modelo_perfil:
         try:
             conexion = obtener_conexion()
             if conexion:
@@ -146,30 +125,40 @@ def bienvenida():
     contexto_map = {
         "pagos": "he visto que consultas mucho sobre 💰 pagos",
         "horario": "veo que te estás organizando bastante con tus clases",
-        "tareas": "he visto que entregas a tiempo tus 📚 tareas"
+        "tareas": "he visto que entregas a tiempo tus 📚 tareas",
+        "institucional": "bienvenido al portal institucional"
     }
     
     contexto = contexto_map.get(interes, "es tu primera vez o tienes consultas variadas")
-    mensaje = f"Hey {nombre} 👋 {contexto}. ¿En qué puedo ayudarte hoy?"
+    
+    # Diferenciamos el mensaje si es un alumno o un padre/profesor
+    if id_estudiante:
+        mensaje = f"Hey {nombre} 👋 {contexto}. ¿En qué puedo ayudarte hoy?"
+    else:
+        mensaje = f"Hola {nombre} 👋 {contexto}. ¿En qué te puedo orientar hoy?"
     
     return jsonify({"ok": True, "mensaje": mensaje})
 
+# ==========================================
+# RUTA DE PREDICCIÓN DE RIESGO
+# ==========================================
 @app.route("/notas", methods=["GET"])
 def notas():
     """Ruta para predecir el riesgo académico usando el modelo de Regresión Lineal."""
-    # [MODIFICADO] Bloqueamos acceso anónimo y extraemos datos reales de BD en vez de simulados
     if not logueado():
         return jsonify({"error": "Debes iniciar sesión primero."}), 401
         
     if not modelo_notas:
         return jsonify({"error": "Modelo predictivo no disponible."})
         
-    id_estudiante = session["id_estudiante"]
+    id_estudiante = session.get("id_estudiante")
+    
+    if not id_estudiante:
+        return jsonify({"error": "Solo los estudiantes tienen acceso al análisis de rendimiento."})
     
     try:
         conexion = obtener_conexion()
         if conexion:
-            # Traemos las variables reales del alumno desde tu vista SQL
             query = "SELECT promedio_actual, tareas_entregadas, tareas_pendientes FROM dataset_rendimiento WHERE id_estudiante = %s"
             df_estudiante = pd.read_sql(query, conexion, params=(id_estudiante,))
             conexion.close()
@@ -186,7 +175,9 @@ def notas():
     except Exception as e:
         return jsonify({"error": f"Error al calcular riesgo: {e}"})
 
-# [MODIFICADO] RUTA DE CHAT HÍBRIDO (PÚBLICO Y PRIVADO)
+# ==========================================
+# RUTA DE CHAT HÍBRIDO (PÚBLICO Y PRIVADO)
+# ==========================================
 @app.route("/chat", methods=["POST"])
 def chat():
     """Endpoint que recibe el texto del frontend y lo procesa con la IA."""
@@ -196,7 +187,7 @@ def chat():
         
     mensaje_usuario = datos["mensaje"]
     
-    # [NUEVO] Obtenemos el ID del estudiante solo si ha iniciado sesión, de lo contrario es None
+    # Obtenemos el ID del estudiante solo si ha iniciado sesión, de lo contrario es None
     id_estudiante = session.get("id_estudiante", None) 
     
     # Pasamos el mensaje a la IA. El chatbot decidirá si le responde o le pide login.
@@ -206,10 +197,12 @@ def chat():
         "respuesta": respuesta_ia.get("respuesta", "Lo siento, tuve un error al procesar tu consulta.")
     })
 
+# ==========================================
+# RUTA DE IA VISUAL
+# ==========================================
 @app.route("/subir_imagen", methods=["POST"])
 def subir_imagen():
     """Ruta unificada para recibir vouchers o DNI y procesarlos con IA Visual."""
-    # [MODIFICADO] Bloqueamos acceso anónimo para seguridad
     if not logueado():
         return jsonify({"error": "No autorizado", "valido": False}), 401
 
