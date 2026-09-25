@@ -17,7 +17,7 @@ def entrenar_chatbot_nlp():
     # 1. CORPUS EXPANDIDO
     datos = {
         "texto": [
-            # INTENCIONES PRIVADAS
+            # INTENCIONES PRIVADAS ORIGINALES
             "quiero ver mis pagos", "cuanto debo", "tengo deudas pendientes", "estado de cuenta", "pagar pension",
             "cuanto deuvo", "q debo", "hay q pagar algo", "deuda de pension", "voucher de pago", 
             
@@ -30,7 +30,15 @@ def entrenar_chatbot_nlp():
             "tengo tareas pendientes", "que tareas me faltan", "actividades pendientes", "deje alguna tarea", "entregas de cursos",
             "q tareas tngo", "hay tarea hoy", "tareas para la casa", "deberes pendientes", "q dejaron de tarea", 
             
-            # INTENCIONES PÚBLICAS E INSTITUCIONALES (NUEVAS)
+            # [NUEVO] INTENCIÓN: ASISTENCIA
+            "mi asistencia", "cuantas faltas tengo", "he faltado mucho", "registro de asistencia", "asisti a clases",
+            "tengo inasistencias", "ver mis faltas", "reporte de asistencia", "llegue tarde", "estado de asistencia",
+
+            # [NUEVO] INTENCIÓN: CURSOS
+            "que cursos llevo", "mis cursos", "materias matriculadas", "cursos de este año", "en que cursos estoy",
+            "lista de cursos", "mis materias", "que cursos me tocan", "ver mis cursos", "cursos asignados",
+
+            # INTENCIONES PÚBLICAS
             "requisitos de apafa", "pagar apafa", "cuota de apafa", "que es apafa", "informacion de apafa",
             "qali warma", "menu escolar", "desayuno qali warma", "alimentos qali warma", "entrega de qali warma",
             "certificado de estudios", "como saco mi certificado", "constancia de estudios", "tramitar certificado", "papeles de estudio",
@@ -41,6 +49,7 @@ def entrenar_chatbot_nlp():
         ],
         "intencion": [
             "pagos"] * 10 + ["horarios"] * 10 + ["notas"] * 10 + ["tareas"] * 10 + \
+            ["asistencia"] * 10 + ["cursos"] * 10 + \
             ["apafa"] * 5 + ["qali_warma"] * 5 + ["certificados"] * 5 + ["desconocido"] * 10
     }
     

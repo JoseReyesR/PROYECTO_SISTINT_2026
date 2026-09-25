@@ -1,19 +1,16 @@
 import joblib
-import re # [NUEVO] Expresiones regulares para limpiar texto
-import nltk # [NUEVO] Librería de procesamiento de lenguaje
-from nltk.stem.snowball import SnowballStemmer # [NUEVO] Para extraer la raíz de las palabras
-from nltk.tokenize import word_tokenize # [NUEVO] Para separar oraciones en palabras
+import re 
+import nltk 
+from nltk.stem.snowball import SnowballStemmer 
+from nltk.tokenize import word_tokenize 
 from conexion_sql import obtener_conexion
 
 print("Cargando modelos NLP...")
-# Cargar los modelos previamente entrenados
 modelo_nlp = joblib.load("modelos/modelo_chatbot.pkl")
 vectorizador = joblib.load("modelos/vectorizer.pkl")
 
-# Inicializamos el stemmer en español fuera de la función para mayor rendimiento
 stemmer = SnowballStemmer('spanish')
 
-# [MODIFICADO] Hacemos que id_estudiante sea opcional (None por defecto) para permitir chat público
 def responder_chatbot(mensaje, id_estudiante=None):
     """
     Procesa el mensaje del usuario, detecta la intención y consulta la BD.
@@ -28,20 +25,19 @@ def responder_chatbot(mensaje, id_estudiante=None):
     intencion = modelo_nlp.predict(texto_vectorizado)[0]
     
     # ==========================================
-    # [NUEVO] BARRERA DE SEGURIDAD DE DATOS (MODELO HÍBRIDO)
-    # Protege la información acedémica según la Ley N° 29733[cite: 9]
+    # [MODIFICADO] BARRERA DE SEGURIDAD DE DATOS
     # ==========================================
-    intenciones_privadas = ["pagos", "horarios", "notas", "tareas"]
+    # [NUEVO] Se añadieron 'asistencia' y 'cursos' a las rutas protegidas
+    intenciones_privadas = ["pagos", "horarios", "notas", "tareas", "asistencia", "cursos"]
     
     if intencion in intenciones_privadas and id_estudiante is None:
         return {
             "intencion": intencion, 
-            "respuesta": "🔒 Para consultar tu información académica personal (notas, pagos, horarios o tareas), por favor **inicia sesión** en el Portal del Estudiante."
+            "respuesta": "🔒 Para consultar tu información académica personal, por favor **inicia sesión** en el Portal del Estudiante."
         }
     
     respuesta = ""
     
-    # Consulta de información en base de datos
     conexion = obtener_conexion()
     if not conexion:
         return {"respuesta": "Error de conexión a la base de datos."}
@@ -49,11 +45,8 @@ def responder_chatbot(mensaje, id_estudiante=None):
     cursor = conexion.cursor(dictionary=True)
     
     try:
-        # Generación de respuestas dinámicas
-        
-        # Manejo de "Out of Scope" (Fuera de contexto)
         if intencion == "desconocido":
-            respuesta = "Lo siento, soy un asistente académico. Solo puedo ayudarte con temas institucionales, matrícula, notas, pagos, horarios y tareas."
+            respuesta = "Lo siento, soy un asistente académico. Solo puedo ayudarte con temas institucionales, matrícula, notas, pagos, horarios, cursos, asistencia y tareas."
             
         elif intencion == "pagos":
             query = "SELECT concepto, monto, estado FROM pagos WHERE id_estudiante = %s"
@@ -113,9 +106,47 @@ def responder_chatbot(mensaje, id_estudiante=None):
                 respuesta = f"📊 Tu rendimiento académico:\n- Promedio actual: {rendimiento['promedio_actual']}\n- Tareas entregadas: {rendimiento['tareas_entregadas']}\n- Tareas pendientes: {rendimiento['tareas_pendientes']}"
             else:
                 respuesta = "No hay notas registradas aún."
+                
+        # ==========================================
+        # [NUEVO] INTENCIONES DE CURSOS Y ASISTENCIA
+        # ==========================================
+        elif intencion == "cursos":
+            query = """
+                SELECT c.nombre, m.anio_escolar 
+                FROM matriculas m
+                JOIN cursos c ON m.id_curso = c.id_curso
+                WHERE m.id_estudiante = %s
+            """
+            cursor.execute(query, (id_estudiante,))
+            cursos_matriculados = cursor.fetchall()
+            
+            if cursos_matriculados:
+                respuesta = "📘 Estás matriculado en los siguientes cursos:\n"
+                for c in cursos_matriculados:
+                    respuesta += f"- {c['nombre']} (Año: {c['anio_escolar']})\n"
+            else:
+                respuesta = "No se encontraron cursos matriculados para tu perfil."
+
+        elif intencion == "asistencia":
+            query = """
+                SELECT a.fecha, a.estado 
+                FROM asistencias a
+                JOIN matriculas m ON a.id_matricula = m.id_matricula
+                WHERE m.id_estudiante = %s
+                ORDER BY a.fecha DESC LIMIT 7
+            """
+            cursor.execute(query, (id_estudiante,))
+            asistencias = cursor.fetchall()
+            
+            if asistencias:
+                respuesta = "📅 Tu registro de asistencia reciente:\n"
+                for a in asistencias:
+                    respuesta += f"- Fecha: {a['fecha']} | Estado: {a['estado']}\n"
+            else:
+                respuesta = "No tienes registros de asistencia en el sistema."
         
         else:
-            # Consultas institucionales públicas (APAFA, Qali Warma, etc.)[cite: 9]
+            # Consultas institucionales públicas (APAFA, Qali Warma, etc.)
             cursor.execute("SELECT respuesta_predefinida FROM intenciones_nlp WHERE nombre_intencion = %s", (intencion,))
             resultado_bd = cursor.fetchone()
             if resultado_bd:
@@ -124,7 +155,6 @@ def responder_chatbot(mensaje, id_estudiante=None):
                 respuesta = "He detectado tu consulta, pero aún estoy aprendiendo a procesarla."
 
         # Registro del historial de consultas
-        # [MODIFICADO] Asignamos un usuario genérico (ej. 1) si es una consulta anónima para evitar errores de llave foránea
         id_historial = id_estudiante if id_estudiante is not None else 1
         cursor.execute("""
             INSERT INTO historial_consultas (id_usuario, id_intencion, mensaje_texto, modalidad) 
@@ -139,6 +169,7 @@ def responder_chatbot(mensaje, id_estudiante=None):
         conexion.close()
 
     return {"intencion": intencion, "respuesta": respuesta}
+
 
 # Prueba rápida
 if __name__ == "__main__":
