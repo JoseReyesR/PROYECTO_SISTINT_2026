@@ -8,7 +8,7 @@ import pandas as pd # [NUEVO] Necesario para pasarle datos de la BD a los modelo
 # Importamos las funciones de tus scripts de IA
 from modelo_imagenes import analizar_documento
 from chatbot import responder_chatbot
-from conexion_sql import obtener_estudiante, obtener_conexion # [NUEVO] Importamos la conexión a BD
+from conexion_sql import obtener_conexion # [NUEVO] Importamos la conexión a BD
 
 app = Flask(__name__)
 app.secret_key = "clave_super_secreta"
@@ -63,21 +63,23 @@ def inicio():
     return render_template("index.html")
 
 # [NUEVO] RUTA DE LOGIN
+# [MODIFICADO] RUTA DE LOGIN REAL
 @app.route("/login", methods=["POST"])
 def login():
-    """Valida las credenciales e inicia la sesión del usuario"""
+    """Valida las credenciales reales contra la base de datos"""
     codigo = request.form.get("codigo")
     password = request.form.get("password")
 
-    if password != PASSWORD_DEMO:
-        return jsonify({"ok": False, "mensaje": "Contraseña incorrecta"})
-
-    estudiante = obtener_estudiante(codigo)
+    # Importa la nueva función desde conexion_sql (asegúrate de actualizar el import arriba)
+    from conexion_sql import obtener_estudiante_login
+    
+    # Validamos enviando tanto el código como el password a MySQL
+    estudiante = obtener_estudiante_login(codigo, password)
 
     if estudiante is None:
-        return jsonify({"ok": False, "mensaje": "Código no encontrado"})
+        return jsonify({"ok": False, "mensaje": "Código no encontrado o contraseña incorrecta"})
 
-    # Guardamos los datos en la memoria segura del servidor (Session)
+    # Guardamos los datos en la memoria segura del servidor
     session["id_estudiante"] = estudiante['id_estudiante']
     session["nombre"] = estudiante['codigo_anonimizado']
 

@@ -55,6 +55,27 @@ def responder_chatbot(mensaje, id_estudiante):
             else:
                 respuesta = "✅ No tienes pagos registrados o deudas pendientes."
                 
+        elif intencion == "tareas":
+            # [NUEVO] Consulta SQL para cruzar cursos, tareas y el estado del estudiante
+            query = """
+                SELECT c.nombre AS curso, t.titulo, t.fecha_vencimiento, et.estado 
+                FROM estado_tareas et
+                JOIN tareas t ON et.id_tarea = t.id_tarea
+                JOIN cursos c ON t.id_curso = c.id_curso
+                WHERE et.id_estudiante = %s AND et.estado IN ('Pendiente', 'Atrasada')
+                ORDER BY t.fecha_vencimiento ASC
+            """
+            cursor.execute(query, (id_estudiante,))
+            tareas_pendientes = cursor.fetchall()
+            
+            if tareas_pendientes:
+                respuesta = "📚 Estas son tus tareas asignadas que faltan entregar:\n"
+                for tarea in tareas_pendientes:
+                    # Formateamos cada tarea encontrada en la base de datos
+                    respuesta += f"- {tarea['curso']}: {tarea['titulo']} | Vence: {tarea['fecha_vencimiento']} | Estado: {tarea['estado']}\n"
+            else:
+                respuesta = "✅ ¡Felicidades! Al parecer has entregado todo y no tienes tareas pendientes."
+                
         elif intencion == "horarios":
             query = """
                 SELECT c.nombre, h.dia_semana, h.hora_inicio 
