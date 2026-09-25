@@ -1,4 +1,8 @@
 import joblib
+import re # [NUEVO] Expresiones regulares para limpiar texto
+import nltk # [NUEVO] Librería de procesamiento de lenguaje
+from nltk.stem.snowball import SnowballStemmer # [NUEVO] Para extraer la raíz de las palabras
+from nltk.tokenize import word_tokenize # [NUEVO] Para separar oraciones en palabras
 from conexion_sql import obtener_conexion
 
 print("Cargando modelos NLP...")
@@ -6,17 +10,26 @@ print("Cargando modelos NLP...")
 modelo_nlp = joblib.load("modelos/modelo_chatbot.pkl")
 vectorizador = joblib.load("modelos/vectorizer.pkl")
 
+# [NUEVO] Inicializamos el stemmer en español fuera de la función para mayor rendimiento
+stemmer = SnowballStemmer('spanish')
+
 def responder_chatbot(mensaje, id_estudiante):
     """
     Procesa el mensaje del estudiante, detecta la intención y consulta la BD.
     """
-    # 1. Identificación de la intención del usuario mediante NLP
-    texto_vectorizado = vectorizador.transform([mensaje])
+    # 1. [NUEVO] Limpieza y Lematización del mensaje del usuario
+    # Convertimos "tengo deudas pendientes?" a "teng deud pendient" para coincidir con el entrenamiento
+    mensaje_limpio = re.sub(r'[^\w\s]', '', mensaje.lower())
+    palabras = word_tokenize(mensaje_limpio)
+    mensaje_lematizado = " ".join([stemmer.stem(p) for p in palabras])
+    
+    # 2. [MODIFICADO] Identificación de la intención usando el texto lematizado
+    texto_vectorizado = vectorizador.transform([mensaje_lematizado])
     intencion = modelo_nlp.predict(texto_vectorizado)[0]
     
     respuesta = ""
     
-    # 2. Consulta de información en base de datos[cite: 3]
+    # Consulta de información en base de datos[cite: 3]
     conexion = obtener_conexion()
     if not conexion:
         return {"respuesta": "Error de conexión a la base de datos."}
@@ -25,7 +38,12 @@ def responder_chatbot(mensaje, id_estudiante):
     
     try:
         # Generación de respuestas dinámicas[cite: 3]
-        if intencion == "pagos":
+        
+        # [NUEVO] Manejo de "Out of Scope" (Fuera de contexto)
+        if intencion == "desconocido":
+            respuesta = "Lo siento, soy un asistente académico. Solo puedo ayudarte con temas como notas, pagos, horarios y tareas."
+            
+        elif intencion == "pagos":
             query = "SELECT concepto, monto, estado FROM pagos WHERE id_estudiante = %s"
             cursor.execute(query, (id_estudiante,))
             deudas = cursor.fetchall()
@@ -66,7 +84,13 @@ def responder_chatbot(mensaje, id_estudiante):
                 respuesta = "No hay notas registradas aún."
         
         else:
-            respuesta = "He detectado una consulta sobre tus tareas o cursos, pero aún estoy aprendiendo a mostrar esos detalles."
+            # [MODIFICADO] Ahora extraemos la respuesta predefinida desde la BD para las nuevas intenciones (apafa, qali_warma, etc.)
+            cursor.execute("SELECT respuesta_predefinida FROM intenciones_nlp WHERE nombre_intencion = %s", (intencion,))
+            resultado_bd = cursor.fetchone()
+            if resultado_bd:
+                respuesta = resultado_bd['respuesta_predefinida']
+            else:
+                respuesta = "He detectado tu consulta, pero aún estoy aprendiendo a procesarla."
 
         # 3. Registro del historial de consultas[cite: 3]
         # Se guarda la interacción para tener memoria (Asumimos id_usuario = 1 temporalmente para el estudiante en el prototipo)
@@ -86,9 +110,11 @@ def responder_chatbot(mensaje, id_estudiante):
 
 # Prueba rápida
 if __name__ == "__main__":
-    # Simulamos que el estudiante con ID 1 pregunta por sus deudas
-    prueba_mensaje = "cuanto debo de pension"
-    resultado = responder_chatbot(prueba_mensaje, 1)
-    print(f"\nUsuario: {prueba_mensaje}")
-    print(f"Intención detectada: {resultado['intencion']}")
-    print(f"Chatbot responde:\n{resultado['respuesta']}")
+    # Simulamos pruebas con regionalismos y "Out of Scope"
+    pruebas = ["cuanto deuvo de pension", "oye causa cuentame un chiste", "q tareas tngo"]
+    
+    for p in pruebas:
+        resultado = responder_chatbot(p, 1)
+        print(f"\nUsuario: {p}")
+        print(f"Intención detectada: {resultado['intencion']}")
+        print(f"Chatbot responde:\n{resultado['respuesta']}")
