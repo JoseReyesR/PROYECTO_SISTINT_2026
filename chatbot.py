@@ -10,26 +10,38 @@ print("Cargando modelos NLP...")
 modelo_nlp = joblib.load("modelos/modelo_chatbot.pkl")
 vectorizador = joblib.load("modelos/vectorizer.pkl")
 
-# [NUEVO] Inicializamos el stemmer en español fuera de la función para mayor rendimiento
+# Inicializamos el stemmer en español fuera de la función para mayor rendimiento
 stemmer = SnowballStemmer('spanish')
 
-def responder_chatbot(mensaje, id_estudiante):
+# [MODIFICADO] Hacemos que id_estudiante sea opcional (None por defecto) para permitir chat público
+def responder_chatbot(mensaje, id_estudiante=None):
     """
-    Procesa el mensaje del estudiante, detecta la intención y consulta la BD.
+    Procesa el mensaje del usuario, detecta la intención y consulta la BD.
     """
-    # 1. [NUEVO] Limpieza y Lematización del mensaje del usuario
-    # Convertimos "tengo deudas pendientes?" a "teng deud pendient" para coincidir con el entrenamiento
+    # 1. Limpieza y Lematización del mensaje del usuario
     mensaje_limpio = re.sub(r'[^\w\s]', '', mensaje.lower())
     palabras = word_tokenize(mensaje_limpio)
     mensaje_lematizado = " ".join([stemmer.stem(p) for p in palabras])
     
-    # 2. [MODIFICADO] Identificación de la intención usando el texto lematizado
+    # 2. Identificación de la intención usando el texto lematizado
     texto_vectorizado = vectorizador.transform([mensaje_lematizado])
     intencion = modelo_nlp.predict(texto_vectorizado)[0]
     
+    # ==========================================
+    # [NUEVO] BARRERA DE SEGURIDAD DE DATOS (MODELO HÍBRIDO)
+    # Protege la información acedémica según la Ley N° 29733[cite: 9]
+    # ==========================================
+    intenciones_privadas = ["pagos", "horarios", "notas", "tareas"]
+    
+    if intencion in intenciones_privadas and id_estudiante is None:
+        return {
+            "intencion": intencion, 
+            "respuesta": "🔒 Para consultar tu información académica personal (notas, pagos, horarios o tareas), por favor **inicia sesión** en el Portal del Estudiante."
+        }
+    
     respuesta = ""
     
-    # Consulta de información en base de datos[cite: 3]
+    # Consulta de información en base de datos
     conexion = obtener_conexion()
     if not conexion:
         return {"respuesta": "Error de conexión a la base de datos."}
@@ -37,11 +49,11 @@ def responder_chatbot(mensaje, id_estudiante):
     cursor = conexion.cursor(dictionary=True)
     
     try:
-        # Generación de respuestas dinámicas[cite: 3]
+        # Generación de respuestas dinámicas
         
-        # [NUEVO] Manejo de "Out of Scope" (Fuera de contexto)
+        # Manejo de "Out of Scope" (Fuera de contexto)
         if intencion == "desconocido":
-            respuesta = "Lo siento, soy un asistente académico. Solo puedo ayudarte con temas como notas, pagos, horarios y tareas."
+            respuesta = "Lo siento, soy un asistente académico. Solo puedo ayudarte con temas institucionales, matrícula, notas, pagos, horarios y tareas."
             
         elif intencion == "pagos":
             query = "SELECT concepto, monto, estado FROM pagos WHERE id_estudiante = %s"
@@ -56,7 +68,6 @@ def responder_chatbot(mensaje, id_estudiante):
                 respuesta = "✅ No tienes pagos registrados o deudas pendientes."
                 
         elif intencion == "tareas":
-            # [NUEVO] Consulta SQL para cruzar cursos, tareas y el estado del estudiante
             query = """
                 SELECT c.nombre AS curso, t.titulo, t.fecha_vencimiento, et.estado 
                 FROM estado_tareas et
@@ -71,7 +82,6 @@ def responder_chatbot(mensaje, id_estudiante):
             if tareas_pendientes:
                 respuesta = "📚 Estas son tus tareas asignadas que faltan entregar:\n"
                 for tarea in tareas_pendientes:
-                    # Formateamos cada tarea encontrada en la base de datos
                     respuesta += f"- {tarea['curso']}: {tarea['titulo']} | Vence: {tarea['fecha_vencimiento']} | Estado: {tarea['estado']}\n"
             else:
                 respuesta = "✅ ¡Felicidades! Al parecer has entregado todo y no tienes tareas pendientes."
@@ -105,7 +115,7 @@ def responder_chatbot(mensaje, id_estudiante):
                 respuesta = "No hay notas registradas aún."
         
         else:
-            # [MODIFICADO] Ahora extraemos la respuesta predefinida desde la BD para las nuevas intenciones (apafa, qali_warma, etc.)
+            # Consultas institucionales públicas (APAFA, Qali Warma, etc.)[cite: 9]
             cursor.execute("SELECT respuesta_predefinida FROM intenciones_nlp WHERE nombre_intencion = %s", (intencion,))
             resultado_bd = cursor.fetchone()
             if resultado_bd:
@@ -113,12 +123,13 @@ def responder_chatbot(mensaje, id_estudiante):
             else:
                 respuesta = "He detectado tu consulta, pero aún estoy aprendiendo a procesarla."
 
-        # 3. Registro del historial de consultas[cite: 3]
-        # Se guarda la interacción para tener memoria (Asumimos id_usuario = 1 temporalmente para el estudiante en el prototipo)
+        # Registro del historial de consultas
+        # [MODIFICADO] Asignamos un usuario genérico (ej. 1) si es una consulta anónima para evitar errores de llave foránea
+        id_historial = id_estudiante if id_estudiante is not None else 1
         cursor.execute("""
             INSERT INTO historial_consultas (id_usuario, id_intencion, mensaje_texto, modalidad) 
-            VALUES (1, (SELECT id_intencion FROM intenciones_nlp WHERE nombre_intencion = %s LIMIT 1), %s, 'Texto')
-        """, (intencion, mensaje))
+            VALUES (%s, (SELECT id_intencion FROM intenciones_nlp WHERE nombre_intencion = %s LIMIT 1), %s, 'Texto')
+        """, (id_historial, intencion, mensaje))
         conexion.commit()
 
     except Exception as e:
@@ -131,11 +142,15 @@ def responder_chatbot(mensaje, id_estudiante):
 
 # Prueba rápida
 if __name__ == "__main__":
-    # Simulamos pruebas con regionalismos y "Out of Scope"
-    pruebas = ["cuanto deuvo de pension", "oye causa cuentame un chiste", "q tareas tngo"]
+    # Simulamos pruebas de chat público (sin iniciar sesión) y privado
+    pruebas = [
+        {"mensaje": "informacion de apafa", "id": None}, 
+        {"mensaje": "cuanto deuvo de pension", "id": None}, 
+        {"mensaje": "cuanto deuvo de pension", "id": 1}
+    ]
     
     for p in pruebas:
-        resultado = responder_chatbot(p, 1)
-        print(f"\nUsuario: {p}")
+        resultado = responder_chatbot(p["mensaje"], p["id"])
+        print(f"\nUsuario (Logueado: {p['id'] is not None}): {p['mensaje']}")
         print(f"Intención detectada: {resultado['intencion']}")
         print(f"Chatbot responde:\n{resultado['respuesta']}")

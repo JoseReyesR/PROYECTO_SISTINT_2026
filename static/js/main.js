@@ -43,6 +43,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.getElementById('home-container').style.display = 'none';
                 dashboardSection.style.display = 'block';
                 document.getElementById('welcome-msg').innerText = `Hola, estudiante ${data.nombre}`;
+                // [NUEVO] Limpiamos todo el historial de chat de la sesión anterior
+                chatMessages.innerHTML = '';
                 
                 // [NUEVO] Consumimos el modelo de Perfilamiento para un saludo personalizado
                 const respBienvenida = await fetch('/bienvenida', { credentials: 'same-origin' });

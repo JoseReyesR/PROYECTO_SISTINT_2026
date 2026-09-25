@@ -59,13 +59,43 @@ def logueado():
 
 @app.route("/")
 def inicio():
+    # [NUEVO] Destruye cualquier sesión activa al recargar la página (F5)
+    session.clear()
     # Flask buscará automáticamente 'index.html' dentro de la carpeta 'templates'
     return render_template("index.html")
 
 # [NUEVO] RUTA DE LOGIN
 # [MODIFICADO] RUTA DE LOGIN REAL
+# [MODIFICADO] RUTA DE LOGIN UNIVERSAL
 @app.route("/login", methods=["POST"])
 def login():
+    codigo_o_usuario = request.form.get("codigo") # Puede recibir "EST-001" o "padre_familia1"
+    password = request.form.get("password")
+
+    from conexion_sql import validar_login_universal
+    
+    usuario = validar_login_universal(codigo_o_usuario, password)
+
+    if usuario is None:
+        return jsonify({"ok": False, "mensaje": "Usuario no encontrado o contraseña incorrecta"})
+
+    # Guardamos datos en sesión dependiendo del rol
+    session["id_usuario"] = usuario['id_usuario']
+    session["rol_id"] = usuario['rol_id']
+    
+    # Si es estudiante (rol_id == 4), guardamos su ID de estudiante para el chatbot
+    if usuario['rol_id'] == 4 and usuario['id_estudiante']:
+        session["id_estudiante"] = usuario['id_estudiante']
+        session["nombre"] = usuario['codigo_anonimizado']
+    else:
+        # Para padres o profes, usamos su username
+        session["nombre"] = usuario['username']
+
+    return jsonify({
+        "ok": True,
+        "nombre": session["nombre"],
+        "rol": usuario['rol_id']
+    })
     """Valida las credenciales reales contra la base de datos"""
     codigo = request.form.get("codigo")
     password = request.form.get("password")
@@ -156,24 +186,22 @@ def notas():
     except Exception as e:
         return jsonify({"error": f"Error al calcular riesgo: {e}"})
 
+# [MODIFICADO] RUTA DE CHAT HÍBRIDO (PÚBLICO Y PRIVADO)
 @app.route("/chat", methods=["POST"])
 def chat():
     """Endpoint que recibe el texto del frontend y lo procesa con la IA."""
-    # [MODIFICADO] Bloqueamos acceso anónimo
-    if not logueado():
-        return jsonify({"respuesta": "La sesión expiró. Vuelve a iniciar sesión."}), 401
-
     datos = request.get_json()
     if not datos or "mensaje" not in datos:
         return jsonify({"error": "No se recibió ningún mensaje."}), 400
         
     mensaje_usuario = datos["mensaje"]
-    id_estudiante = session["id_estudiante"] # [NUEVO] Obtenemos ID real de sesión
     
-    # [MODIFICADO] Pasamos el id_estudiante al chatbot para que consulte su deuda específica
+    # [NUEVO] Obtenemos el ID del estudiante solo si ha iniciado sesión, de lo contrario es None
+    id_estudiante = session.get("id_estudiante", None) 
+    
+    # Pasamos el mensaje a la IA. El chatbot decidirá si le responde o le pide login.
     respuesta_ia = responder_chatbot(mensaje_usuario, id_estudiante)
     
-    # [MODIFICADO] Manejamos el diccionario que devuelve responder_chatbot (intencion, respuesta)
     return jsonify({
         "respuesta": respuesta_ia.get("respuesta", "Lo siento, tuve un error al procesar tu consulta.")
     })
