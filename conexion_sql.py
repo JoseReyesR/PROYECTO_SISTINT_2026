@@ -18,29 +18,66 @@ def obtener_conexion():
         print(f"❌ Error al conectar a MySQL: {e}")
         return None
 
-def obtener_estudiante(codigo_anonimizado):
+def validar_login_universal(identificador, password_ingresada):
     """
-    Realiza la consulta SQL para validar si el estudiante existe en el sistema.
+    [NUEVO] Permite el ingreso de CUALQUIER usuario (padres, profes, alumnos)
+    buscando por 'username' o por 'codigo_anonimizado'.
     """
     try:
         conexion = obtener_conexion()
         if conexion and conexion.is_connected():
-            # dictionary=True nos permite acceder a los datos por nombre de columna
             cursor = conexion.cursor(dictionary=True) 
             
-            # Buscamos al estudiante en la tabla anonimizada[cite: 1]
+            # Buscamos en usuarios por username o cruzando con estudiantes por el código EST-
             query = """
-                SELECT id_estudiante, codigo_anonimizado, nivel_educativo, grado, seccion, estado_riesgo 
-                FROM estudiantes 
-                WHERE codigo_anonimizado = %s
+                SELECT u.id_usuario, u.username, u.password_hash, u.rol_id, 
+                       e.id_estudiante, e.codigo_anonimizado
+                FROM usuarios u
+                LEFT JOIN estudiantes e ON u.id_usuario = e.id_usuario
+                WHERE u.username = %s OR e.codigo_anonimizado = %s
+            """
+            cursor.execute(query, (identificador, identificador))
+            usuario = cursor.fetchone()
+            
+            # Validamos que el usuario exista y la contraseña coincida
+            if usuario and usuario['password_hash'] == password_ingresada:
+                return usuario
+            else:
+                return None
+                
+    except Error as e:
+        print(f"❌ Error en la consulta de login: {e}")
+        return None
+    finally:
+        if conexion and conexion.is_connected():
+            cursor.close()
+            conexion.close()
+    """
+    [MODIFICADO] Realiza un JOIN entre estudiantes y usuarios para validar credenciales reales.
+    """
+    try:
+        conexion = obtener_conexion()
+        if conexion and conexion.is_connected():
+            cursor = conexion.cursor(dictionary=True) 
+            
+            # Buscamos al estudiante y traemos su contraseña de la tabla usuarios vinculada
+            query = """
+                SELECT e.id_estudiante, e.codigo_anonimizado, u.password_hash 
+                FROM estudiantes e
+                JOIN usuarios u ON e.id_usuario = u.id_usuario
+                WHERE e.codigo_anonimizado = %s
             """
             cursor.execute(query, (codigo_anonimizado,))
             estudiante = cursor.fetchone()
             
-            return estudiante
+            # Si el estudiante existe y la contraseña coincide
+            if estudiante and estudiante['password_hash'] == password_ingresada:
+                return estudiante # Login exitoso
+            else:
+                return None # Contraseña incorrecta o usuario no encontrado
             
     except Error as e:
-        print(f"❌ Error en la consulta a la base de datos: {e}")
+        print(f"❌ Error en la consulta de login: {e}")
         return None
     finally:
         if conexion and conexion.is_connected():
