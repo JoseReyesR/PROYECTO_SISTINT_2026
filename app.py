@@ -4,6 +4,7 @@ import mysql.connector
 import joblib
 import os
 import pandas as pd # Necesario para pasarle datos de la BD a los modelos
+import speech_recognition as sr # [NUEVO] Librería académica para procesamiento de voz
 
 # Importamos las funciones de tus scripts de IA
 from modelo_imagenes import analizar_documento
@@ -196,6 +197,56 @@ def chat():
     return jsonify({
         "respuesta": respuesta_ia.get("respuesta", "Lo siento, tuve un error al procesar tu consulta.")
     })
+
+# ==========================================
+# [NUEVO] RUTA DE CHAT POR VOZ (SPEECH-TO-TEXT)
+# ==========================================
+@app.route("/chat_audio", methods=["POST"])
+def chat_audio():
+    """Recibe un archivo de audio del frontend, lo convierte a texto y lo procesa con la IA."""
+    if "audio" not in request.files:
+        return jsonify({"error": "No se envió ningún archivo de audio."}), 400
+
+    archivo_audio = request.files["audio"]
+    if archivo_audio.filename == "":
+        return jsonify({"error": "Archivo de audio vacío."}), 400
+
+    # Guardamos el audio temporalmente en el servidor
+    nombre_seguro = secure_filename("grabacion_temporal.wav")
+    ruta_audio = os.path.join(app.config["UPLOAD_FOLDER"], nombre_seguro)
+    archivo_audio.save(ruta_audio)
+
+    id_estudiante = session.get("id_estudiante", None)
+
+    try:
+        # Procesamiento de la señal de voz utilizando la librería académica
+        reconocedor = sr.Recognizer()
+        with sr.AudioFile(ruta_audio) as origen:
+            # Lee el archivo de audio guardado
+            audio_data = reconocedor.record(origen)
+            # Convierte la señal en texto
+            texto_transcrito = reconocedor.recognize_google(audio_data, language="es-PE")
+        
+        # Una vez que tenemos el texto, lo pasamos al modelo NLP del chatbot
+        respuesta_ia = responder_chatbot(texto_transcrito, id_estudiante)
+        
+        # Limpiamos el archivo temporal para no saturar el servidor
+        os.remove(ruta_audio)
+
+        return jsonify({
+            "texto_reconocido": texto_transcrito,
+            "respuesta": respuesta_ia.get("respuesta", "Lo siento, tuve un error al procesar tu consulta.")
+        })
+
+    except sr.UnknownValueError:
+        if os.path.exists(ruta_audio): os.remove(ruta_audio)
+        return jsonify({"error": "No pude entender el audio. Intenta hablar más claro."}), 400
+    except sr.RequestError:
+        if os.path.exists(ruta_audio): os.remove(ruta_audio)
+        return jsonify({"error": "Error de conexión con el servicio de reconocimiento de voz."}), 500
+    except Exception as e:
+        if os.path.exists(ruta_audio): os.remove(ruta_audio)
+        return jsonify({"error": f"Error procesando el audio: {e}"}), 500
 
 # ==========================================
 # RUTA DE IA VISUAL
