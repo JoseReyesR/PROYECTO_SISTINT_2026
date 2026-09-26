@@ -1,11 +1,16 @@
+import warnings
+# Silenciamos la advertencia de Pandas sobre SQLAlchemy
+warnings.filterwarnings('ignore', category=UserWarning)
+
 import mysql.connector
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
+from sklearn.cluster import KMeans
 import joblib
 import os
 
 def entrenar_modelo_perfil():
-    print("🔄 Conectando a MySQL para entrenar el modelo de Perfilamiento...")
+    print("🔄 Iniciando entrenamiento de Clustering (K-Means)...")
+    
     try:
         conexion = mysql.connector.connect(
             host='localhost',
@@ -14,47 +19,40 @@ def entrenar_modelo_perfil():
             password='1234'
         )
         
-        # Extraemos los datos de la vista dataset_perfil_usuario
+        # Extraemos las tres variables de tu dataset original
         query = "SELECT cursos_matriculados, pagos_realizados, tareas_entregadas_total FROM dataset_perfil_usuario"
         df = pd.read_sql(query, conexion)
         conexion.close()
         
+        print(f"📊 Registros extraídos para perfilamiento: {len(df)}")
+        
         if len(df) == 0:
-            print("⚠️ No hay datos suficientes para entrenar.")
-            return
+            print("⚠️ No hay suficientes datos en la BD para agrupar perfiles.")
+            return None
 
-        # Generamos etiquetas simuladas de perfiles para el prototipo
-        # 0 = Desorganizado/Riesgo, 1 = Regular, 2 = Organizado/Responsable
-        def definir_perfil(row):
-            if row['tareas_entregadas_total'] >= 2 and row['pagos_realizados'] > 0:
-                return "tareas" # Perfil enfocado en tareas/organizado
-            elif row['pagos_realizados'] == 0:
-                return "pagos" # Perfil con problemas de pagos
-            else:
-                return "horario" # Perfil estándar
-                
-        df['etiqueta_perfil'] = df.apply(definir_perfil, axis=1)
-        
-        # Variables independientes (X) y variable objetivo (y)
+        # Definimos las variables independientes (X) usando tus columnas exactas. 
+        # Al ser Aprendizaje No Supervisado, no usamos etiquetas 'y'.
         X = df[['cursos_matriculados', 'pagos_realizados', 'tareas_entregadas_total']]
-        y = df['etiqueta_perfil']
         
-        # Entrenamiento con Regresión Logística
-        modelo_perfil = LogisticRegression()
-        modelo_perfil.fit(X, y)
+        # Configuramos K-Means para descubrir 3 grupos naturales (Ej: Inactivo, Regular, Sobresaliente)
+        print("⚙️ Agrupando estudiantes mediante aprendizaje no supervisado...")
+        modelo_kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+        modelo_kmeans.fit(X)
         
-        # Guardado en la carpeta de modelos
         carpeta_modelos = "modelos"
         if not os.path.exists(carpeta_modelos):
             os.makedirs(carpeta_modelos)
             
+        # Exportamos el modelo entrenado
         ruta_modelo = os.path.join(carpeta_modelos, 'modelo_perfil_usuario.pkl')
-        joblib.dump(modelo_perfil, ruta_modelo)
+        joblib.dump(modelo_kmeans, ruta_modelo)
         
-        print(f"✅ ¡Modelo de perfilamiento entrenado y guardado en '{ruta_modelo}'!")
+        print("✅ ¡Clustering finalizado! Guardado como 'modelo_perfil_usuario.pkl'")
+        return modelo_kmeans
 
     except Exception as e:
-        print(f"❌ Error durante el entrenamiento: {e}")
+        print(f"❌ Error durante el entrenamiento del perfilamiento: {e}")
+        return None
 
 if __name__ == "__main__":
     entrenar_modelo_perfil()
