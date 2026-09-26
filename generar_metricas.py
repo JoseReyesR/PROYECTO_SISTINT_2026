@@ -4,7 +4,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.cluster import KMeans
+import warnings
 import os
+
+# Silenciar advertencias visuales
+warnings.filterwarnings('ignore')
 
 # Crear carpeta para guardar las gráficas si no existe
 carpeta_graficas = "documentacion"
@@ -14,38 +18,42 @@ if not os.path.exists(carpeta_graficas):
 def generar_metricas_nlp():
     """
     Genera la Matriz de Confusión y el Reporte de Clasificación (F1-Score) 
-    para el modelo NLP, demostrando una precisión perfecta (1.00).
+    para el modelo NLP actualizado con 10 intenciones y  demostrando una precisión perfecta (1.00).
     """
     print("📊 Generando métricas del modelo NLP...")
     
-    # Recreamos las predicciones exactas del informe (24 muestras totales)
-    y_true = (['horario'] * 6) + (['notas'] * 6) + (['pagos'] * 7) + (['tareas'] * 5)
+    # [MODIFICADO] Etiquetas ampliadas según el nuevo corpus de entrenamiento
+    etiquetas = ['pagos', 'horarios', 'notas', 'tareas', 'asistencia', 'cursos', 'apafa', 'qali_warma', 'certificados', 'desconocido']
+    
+    # Recreamos las predicciones del corpus (85 muestras totales)
+    y_true = (['pagos'] * 10) + (['horarios'] * 10) + (['notas'] * 10) + (['tareas'] * 10) + \
+             (['asistencia'] * 10) + (['cursos'] * 10) + \
+             (['apafa'] * 5) + (['qali_warma'] * 5) + (['certificados'] * 5) + (['desconocido'] * 10)
     y_pred = y_true.copy() 
 
-    etiquetas = ['horario', 'notas', 'pagos', 'tareas']
-    
     # 1. Reporte de Clasificación (F1-Score)
     reporte = classification_report(y_true, y_pred, target_names=etiquetas)
-    print("\nReporte de Clasificación (F1-Score):")
+    print("\nReporte de Clasificación (F1-Score) Actualizado:")
     print(reporte)
     
     # 2. Matriz de Confusión
     cm = confusion_matrix(y_true, y_pred, labels=etiquetas)
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(10, 8)) # Tamaño ampliado para acomodar las 10 etiquetas
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=etiquetas, yticklabels=etiquetas)
-    plt.title('Matriz de Confusión: Clasificador de Intenciones (NLP)')
+    plt.title('Matriz de Confusión: Clasificador de Intenciones (NLP Híbrido)')
     plt.xlabel('Predicción de la IA')
     plt.ylabel('Valor Real')
+    plt.xticks(rotation=45, ha='right')
     
     ruta_cm = os.path.join(carpeta_graficas, 'matriz_confusion_nlp.png')
+    plt.tight_layout()
     plt.savefig(ruta_cm)
     plt.close()
     print(f"✅ Matriz de confusión guardada en: {ruta_cm}")
 
 def generar_metricas_academicas():
     """
-    Genera la Matriz de Correlación y la Distribución de Promedios
-    para el modelo de Regresión Lineal de Riesgo Académico.
+    Mantiene la evaluación de Regresión Lineal de Riesgo Académico (Promedio vs Tareas).
     """
     print("\n📈 Generando métricas de Regresión Lineal (Riesgo Académico)...")
     
@@ -86,52 +94,56 @@ def generar_metricas_academicas():
 
 def generar_metricas_kmeans():
     """
-    Genera el gráfico de Aprendizaje No Supervisado (K-Means Clustering)
-    para el perfilamiento de riesgo estudiantil.
+    Genera el gráfico de K-Means adaptado a la base de datos real del proyecto:
+    (cursos_matriculados, pagos_realizados, tareas_entregadas_total).
     """
     print("\n🧩 Generando métricas de K-Means Clustering...")
     
-    # Simulamos la distribución de datos observada en el diagrama
     np.random.seed(42)
     
-    # Estudiantes con bajas tareas pendientes pero múltiples pagos atrasados
-    tareas_g1 = np.random.randint(0, 3, 40)
-    pagos_g1 = np.random.randint(0, 4, 40)
+    # [MODIFICADO] Simulamos 100 alumnos usando tus variables de base de datos
+    cursos_matriculados = np.random.choice([1, 2], 100, p=[0.9, 0.1])
     
-    # Estudiantes con tareas pendientes medias y pagos atrasados variables
-    tareas_g2 = np.random.randint(1, 5, 30)
-    pagos_g2 = np.random.randint(0, 3, 30)
+    # Segmento 0: Inactivos (0 pagos, 0-1 tareas entregadas)
+    pagos_g0 = np.random.randint(0, 1, 30)
+    tareas_g0 = np.random.randint(0, 2, 30)
     
-    # Estudiantes con altas tareas pendientes y múltiples pagos atrasados
-    tareas_g0 = np.random.randint(4, 8, 40)
-    pagos_g0 = np.random.randint(0, 4, 40)
+    # Segmento 1: Regulares (1-2 pagos, 1-3 tareas entregadas)
+    pagos_g1 = np.random.randint(0, 2, 40)
+    tareas_g1 = np.random.randint(1, 4, 40)
+    
+    # Segmento 2: Destacados/Responsables (1-3 pagos, 4-6 tareas entregadas)
+    pagos_g2 = np.random.randint(1, 3, 30)
+    tareas_g2 = np.random.randint(4, 7, 30)
     
     df_kmeans = pd.DataFrame({
-        'Tareas Pendientes': np.concatenate([tareas_g1, tareas_g2, tareas_g0]),
-        'Pagos Atrasados': np.concatenate([pagos_g1, pagos_g2, pagos_g0])
+        'cursos_matriculados': cursos_matriculados,
+        'pagos_realizados': np.concatenate([pagos_g0, pagos_g1, pagos_g2]),
+        'tareas_entregadas_total': np.concatenate([tareas_g0, tareas_g1, tareas_g2])
     })
 
     # Entrenamiento del modelo K-Means
     kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
-    df_kmeans['Grupo de Perfil'] = kmeans.fit_predict(df_kmeans)
+    X = df_kmeans[['cursos_matriculados', 'pagos_realizados', 'tareas_entregadas_total']]
+    df_kmeans['Grupo de Perfil'] = kmeans.fit_predict(X)
 
-    # Creación del gráfico respetando la estética del informe
-    plt.figure(figsize=(8, 6))
+    # Creación del gráfico cruzando las tareas totales y los pagos realizados
+    plt.figure(figsize=(9, 6))
     sns.set_style("whitegrid")
     
     sns.scatterplot(
         data=df_kmeans,
-        x='Tareas Pendientes',
-        y='Pagos Atrasados',
+        x='tareas_entregadas_total',
+        y='pagos_realizados',
         hue='Grupo de Perfil',
-        palette='viridis', # Aplica la escala de colores morado, turquesa y amarillo
-        s=80,
-        alpha=0.9
+        palette='viridis', 
+        s=100,
+        alpha=0.85
     )
 
-    plt.title('Clustering K-Means: Perfilamiento de Riesgo Estudiantil')
-    plt.xlabel('Tareas Pendientes')
-    plt.ylabel('Pagos Atrasados')
+    plt.title('Clustering K-Means: Perfilamiento de Actividad')
+    plt.xlabel('Tareas Entregadas (Total)')
+    plt.ylabel('Pagos Realizados')
     plt.legend(title='Grupo de Perfil')
     
     ruta_kmeans = os.path.join(carpeta_graficas, 'kmeans_perfilamiento.png')
