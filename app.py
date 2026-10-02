@@ -124,11 +124,10 @@ def bienvenida():
             print(f"Error al predecir perfil: {e}")
 
     contexto_map = {
-        "pagos": "he visto que consultas mucho sobre 💰 pagos",
-        "horario": "veo que te estás organizando bastante con tus clases",
-        "tareas": "he visto que entregas a tiempo tus 📚 tareas",
-        "institucional": "bienvenido al portal institucional"
-    }
+        0: "he notado poca actividad reciente. ¡Recuerda que estoy aquí para ayudarte a ponerte al día!",
+        1: "he visto que estás avanzando, pero tienes varias tareas pendientes. ¿Las revisamos?", # El Grupo 2 es el intermedio/atrasado
+        2: "veo que te estás organizando excelente con tus entregas. ¡Sigue así!" # El Grupo 1 es el destacado
+        }
     
     contexto = contexto_map.get(interes, "es tu primera vez o tienes consultas variadas")
     
