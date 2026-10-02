@@ -5,6 +5,7 @@ warnings.filterwarnings('ignore', category=UserWarning)
 import mysql.connector
 import pandas as pd
 from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score # [NUEVO] Importado para evaluar calidad del clúster no supervisado
 import joblib
 import os
 
@@ -37,7 +38,16 @@ def entrenar_modelo_perfil():
         # Configuramos K-Means para descubrir 3 grupos naturales (Ej: Inactivo, Regular, Sobresaliente)
         print("⚙️ Agrupando estudiantes mediante aprendizaje no supervisado...")
         modelo_kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
-        modelo_kmeans.fit(X)
+        
+        # [MODIFICADO] Usamos fit_predict para entrenar y obtener de inmediato las etiquetas generadas
+        etiquetas_predichas = modelo_kmeans.fit_predict(X)
+        
+        # [NUEVO] VALIDACIÓN DE SILUETA (Métrica para Aprendizaje No Supervisado)
+        score_silueta = silhouette_score(X, etiquetas_predichas)
+        
+        print("\n📊 MÉTRICA DE APRENDIZAJE NO SUPERVISADO:")
+        print(f"Coeficiente de Silueta: {score_silueta:.4f}")
+        print("*(Valores más cercanos a 1.0 indican clústeres densos y bien separados)*")
         
         carpeta_modelos = "modelos"
         if not os.path.exists(carpeta_modelos):
@@ -47,7 +57,7 @@ def entrenar_modelo_perfil():
         ruta_modelo = os.path.join(carpeta_modelos, 'modelo_perfil_usuario.pkl')
         joblib.dump(modelo_kmeans, ruta_modelo)
         
-        print("✅ ¡Clustering finalizado! Guardado como 'modelo_perfil_usuario.pkl'")
+        print("\n✅ ¡Clustering finalizado! Guardado como 'modelo_perfil_usuario.pkl'")
         return modelo_kmeans
 
     except Exception as e:
