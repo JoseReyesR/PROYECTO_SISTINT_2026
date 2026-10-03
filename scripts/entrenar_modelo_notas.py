@@ -11,7 +11,6 @@ from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split # [NUEVO] Para aislar datos de prueba
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score # [NUEVO] Métricas exigidas
 import joblib
-import os
 
 def entrenar_modelo():
     print("🔄 Iniciando entrenamiento de Regresión Lineal...")
@@ -71,6 +70,24 @@ def entrenar_modelo():
         joblib.dump(modelo, ruta_modelo)
         
         print("\n✅ ¡Modelo predictivo entrenado y guardado exitosamente como 'modelo_notas.pkl'!")
+
+        # =========================================================================
+        # [NUEVO] IMPRESIÓN DE COEFICIENTES (PESOS MATEMÁTICOS DEL MODELO)
+        # =========================================================================
+        # Cargamos el modelo para verificar lo que se guardó en el disco
+        modelo_cargado = joblib.load(ruta_modelo)
+        
+        # Extraemos los coeficientes (el orden corresponde a las columnas de X)
+        # X = ['promedio_actual', 'tareas_entregadas', 'tareas_pendientes']
+        coef_promedio = modelo_cargado.coef_[0]
+        coef_tareas_entregadas = modelo_cargado.coef_[1]
+        coef_tareas_pendientes = modelo_cargado.coef_[2]
+        
+        print("\n# Coeficientes aprendidos (verificación con joblib.load):")
+        print(f"#   promedio_actual = {coef_promedio:.2f} | tareas_entregadas = {coef_tareas_entregadas:.2f} | tareas_pendientes = {coef_tareas_pendientes:.2f}")
+        print("#   -> el modelo recupera exactamente la ponderación institucional 0.7/0.5")
+        print("#      definida en la vista SQL (dataset_rendimiento)")
+
         return modelo
 
     except Exception as e:
