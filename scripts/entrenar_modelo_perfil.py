@@ -1,3 +1,9 @@
+from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 import warnings
 # Silenciamos la advertencia de Pandas sobre SQLAlchemy
 warnings.filterwarnings('ignore', category=UserWarning)
@@ -14,10 +20,11 @@ def entrenar_modelo_perfil():
     
     try:
         conexion = mysql.connector.connect(
-            host='localhost',
-            database='chatbot_siagie_db',
-            user='root',
-            password='1234'
+            host=os.getenv("DB_HOST", "localhost"),
+            port=int(os.getenv("DB_PORT", "3306")),
+            database=os.getenv("DB_NAME", "chatbot_siagie_db"),
+            user=os.getenv("DB_USER", "root"),
+            password=os.getenv("DB_PASSWORD", "")
         )
         
         # Extraemos las tres variables de tu dataset original

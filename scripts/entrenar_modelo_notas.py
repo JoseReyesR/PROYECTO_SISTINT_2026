@@ -1,3 +1,9 @@
+from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 import mysql.connector
 import pandas as pd
 import numpy as np # [NUEVO] Importado para operaciones matemáticas en las métricas
@@ -13,10 +19,11 @@ def entrenar_modelo():
     try:
         # Establecemos la conexión usando tus credenciales
         conexion = mysql.connector.connect(
-            host='localhost',
-            database='chatbot_siagie_db',
-            user='root',
-            password='1234'
+            host=os.getenv("DB_HOST", "localhost"),
+            port=int(os.getenv("DB_PORT", "3306")),
+            database=os.getenv("DB_NAME", "chatbot_siagie_db"),
+            user=os.getenv("DB_USER", "root"),
+            password=os.getenv("DB_PASSWORD", "")
         )
         
         # Consultamos la vista que ya incluye la nota_final calculada en SQL
