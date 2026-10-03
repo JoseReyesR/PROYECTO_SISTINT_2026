@@ -12,7 +12,7 @@ from chatbot import responder_chatbot
 from conexion_sql import obtener_conexion # Importamos la conexión a BD
 
 app = Flask(__name__)
-app.secret_key = os.environ["SECRET_KEY"]
+app.secret_key = "clave_super_secreta"
 
 # ==========================================
 # CONFIGURACIÓN DE SESIONES Y LOGIN
