@@ -13,7 +13,6 @@ import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score # [NUEVO] Importado para evaluar calidad del clúster no supervisado
 import joblib
-import os
 
 def entrenar_modelo_perfil():
     print("🔄 Iniciando entrenamiento de Clustering (K-Means)...")
@@ -24,7 +23,7 @@ def entrenar_modelo_perfil():
             database='chatbot_siagie_db',
             user='root',
             password='1234'
-       )
+        )
         
         # Extraemos las tres variables de tu dataset original
         query = "SELECT cursos_matriculados, pagos_realizados, tareas_entregadas_total FROM dataset_perfil_usuario"
@@ -63,7 +62,48 @@ def entrenar_modelo_perfil():
         ruta_modelo = os.path.join(carpeta_modelos, 'modelo_perfil_usuario.pkl')
         joblib.dump(modelo_kmeans, ruta_modelo)
         
-        print("\n✅ ¡Clustering finalizado! Guardado como 'modelo_perfil_usuario.pkl'")
+        print(f"\n✅ ¡Clustering finalizado! Guardado como 'modelo_perfil_usuario.pkl'")
+
+        # =========================================================================
+        # [NUEVO] IMPRESIÓN DE LA COMPOSICIÓN DE LOS GRUPOS
+        # =========================================================================
+        print("\n# Composición de los grupos (verificación con joblib.load):")
+        
+        # 1. Cargamos el modelo guardado para la verificación
+        modelo_cargado = joblib.load(ruta_modelo)
+        
+        # 2. Agregamos las etiquetas predichas al dataframe original
+        df['cluster'] = modelo_cargado.labels_
+        
+        # 3. Calculamos la cantidad de alumnos y el promedio de pagos y tareas por cluster
+        resumen = df.groupby('cluster').agg(
+            cantidad=('cursos_matriculados', 'count'),
+            promedio_pagos=('pagos_realizados', 'mean'),
+            promedio_tareas=('tareas_entregadas_total', 'mean')
+        ).reset_index()
+
+        # 4. Ordenamos de menor a mayor cantidad de tareas para deducir qué grupo es cuál
+        resumen_ordenado = resumen.sort_values(by='promedio_tareas')
+        etiquetas_logicas = ["de actividad baja", "de actividad intermedia", "destacados"]
+        resumen_ordenado['etiqueta_texto'] = etiquetas_logicas
+        
+        # Función auxiliar para formatear los números y quitar decimales innecesarios (.0)
+        def formatear_numero(val):
+            val_redondeado = round(val, 2)
+            return int(val_redondeado) if val_redondeado == int(val_redondeado) else val_redondeado
+
+        # 5. Imprimimos el resultado final cruzando los datos
+        for _, fila in resumen.iterrows():
+            cluster_id = int(fila['cluster'])
+            cantidad = int(fila['cantidad'])
+            pagos_fmt = formatear_numero(fila['promedio_pagos'])
+            tareas_fmt = formatear_numero(fila['promedio_tareas'])
+            
+            # Obtenemos el texto semántico dinámico para este cluster
+            etiqueta = resumen_ordenado[resumen_ordenado['cluster'] == cluster_id]['etiqueta_texto'].values[0]
+            
+            print(f"#   cluster {cluster_id}: {cantidad} estudiantes {etiqueta} ({pagos_fmt} pagos, {tareas_fmt} tareas)")
+
         return modelo_kmeans
 
     except Exception as e:
