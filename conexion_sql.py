@@ -14,12 +14,11 @@ def obtener_conexion():
     """
     try:
         conexion = mysql.connector.connect(
-            host=os.getenv("DB_HOST", "localhost"),
-            port=int(os.getenv("DB_PORT", "3306")),
-            database=os.getenv("DB_NAME", "chatbot_siagie_db"),
-            user=os.getenv("DB_USER", "root"), 
-            password=os.getenv("DB_PASSWORD", "")
-        )
+            host='localhost',
+            database='chatbot_siagie_db',
+            user='root', 
+            password='1234'  # MODIFICADO: Se agregó la contraseña de tu Workbench
+       )
         return conexion
     except Error as e:
         print(f"❌ Error al conectar a MySQL: {e}")

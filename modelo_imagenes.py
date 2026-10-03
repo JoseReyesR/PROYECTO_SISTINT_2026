@@ -7,7 +7,7 @@ from PIL import Image
 from dotenv import load_dotenv
 
 # 1. Cargar las variables de entorno locales (el archivo .env)
-load_dotenv(Path(__file__).resolve().parent / ".env")
+load_dotenv()
 
 # 2. Configurar Tesseract de forma dinámica
 tesseract_path = os.getenv("TESSERACT_PATH")

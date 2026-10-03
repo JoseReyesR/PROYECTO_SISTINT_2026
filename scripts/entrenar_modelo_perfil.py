@@ -20,12 +20,11 @@ def entrenar_modelo_perfil():
     
     try:
         conexion = mysql.connector.connect(
-            host=os.getenv("DB_HOST", "localhost"),
-            port=int(os.getenv("DB_PORT", "3306")),
-            database=os.getenv("DB_NAME", "chatbot_siagie_db"),
-            user=os.getenv("DB_USER", "root"),
-            password=os.getenv("DB_PASSWORD", "")
-        )
+            host='localhost',
+            database='chatbot_siagie_db',
+            user='root',
+            password='1234'
+       )
         
         # Extraemos las tres variables de tu dataset original
         query = "SELECT cursos_matriculados, pagos_realizados, tareas_entregadas_total FROM dataset_perfil_usuario"

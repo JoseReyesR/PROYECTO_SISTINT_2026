@@ -19,11 +19,10 @@ def entrenar_modelo():
     try:
         # Establecemos la conexión usando tus credenciales
         conexion = mysql.connector.connect(
-            host=os.getenv("DB_HOST", "localhost"),
-            port=int(os.getenv("DB_PORT", "3306")),
-            database=os.getenv("DB_NAME", "chatbot_siagie_db"),
-            user=os.getenv("DB_USER", "root"),
-            password=os.getenv("DB_PASSWORD", "")
+             host='localhost',
+            database='chatbot_siagie_db',
+            user='root',
+            password='1234'
         )
         
         # Consultamos la vista que ya incluye la nota_final calculada en SQL
