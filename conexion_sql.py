@@ -1,3 +1,9 @@
+from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 import mysql.connector
 from mysql.connector import Error
 
@@ -12,7 +18,7 @@ def obtener_conexion():
             database='chatbot_siagie_db',
             user='root', 
             password='1234'  # MODIFICADO: Se agregó la contraseña de tu Workbench
-        )
+       )
         return conexion
     except Error as e:
         print(f"❌ Error al conectar a MySQL: {e}")

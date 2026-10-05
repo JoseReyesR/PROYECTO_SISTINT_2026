@@ -274,4 +274,8 @@ def subir_imagen():
     return jsonify(resultado_ia)
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(
+        host=os.getenv("APP_HOST", "127.0.0.1"),
+        port=int(os.getenv("APP_PORT", "5000")),
+        debug=os.getenv("APP_DEBUG", "false").lower() in {"1", "true", "yes"},
+    )

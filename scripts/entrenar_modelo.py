@@ -152,7 +152,34 @@ def entrenar_chatbot_nlp_riguroso():
     joblib.dump(modelo_nlp, os.path.join(carpeta_modelos, "modelo_chatbot.pkl"))
     joblib.dump(vectorizador, os.path.join(carpeta_modelos, "vectorizer.pkl"))
     
-    print(f"✅ ¡Modelo NLP entrenado y validado experimentalmente con éxito!")
+    # =========================================================================
+    # [NUEVO] VERIFICACIÓN CON LOS ARTEFACTOS DE PRODUCCIÓN (NLP)
+    # =========================================================================
+    modelo_cargado = joblib.load(os.path.join(carpeta_modelos, "modelo_chatbot.pkl"))
+    vectorizador_cargado = joblib.load(os.path.join(carpeta_modelos, "vectorizer.pkl"))
+
+    correctos = sum(y_test == y_pred)
+    total = len(y_test)
+    accuracy = correctos / total
+    vocab_size = len(vectorizador_cargado.vocabulary_)
+    pesos_shape = modelo_cargado.coef_.shape
+
+    print("\n# Verificación con los artefactos de producción (joblib.load de modelos/*.pkl) correctos:")
+    print(f"#   {correctos}/{total} = {accuracy:.2f}  |  vocabulario TF-IDF: {vocab_size} términos  |  pesos: {pesos_shape[0]} x {pesos_shape[1]}")
+
+    print("\n# FRASES MAL CLASIFICADAS DEL CONJUNTO DE PRUEBA:")
+    errores = 0
+    # Recuperamos los textos originales sin lematizar basándonos en el índice
+    textos_originales = df.loc[X_test.index, 'texto']
+    for frase, real, predicho in zip(textos_originales, y_test, y_pred):
+        if real != predicho:
+            print(f"#   '{frase}'")
+            print(f"#       REAL: {real}      PREDICHO: {predicho}")
+            errores += 1
+            
+    print(f"#   (Total de errores: {errores} de {total})")
+    
+    print(f"\n✅ ¡Modelo NLP entrenado y validado experimentalmente con éxito!")
 
 if __name__ == "__main__":
     entrenar_chatbot_nlp_riguroso()
