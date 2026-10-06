@@ -6,10 +6,10 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 import mysql.connector
 import pandas as pd
-import numpy as np # [NUEVO] Importado para operaciones matemáticas en las métricas
+import numpy as np # Importado para operaciones matemáticas y generación de ruido
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split # [NUEVO] Para aislar datos de prueba
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score # [NUEVO] Métricas exigidas
+from sklearn.model_selection import train_test_split # Para aislar datos de prueba
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score # Métricas exigidas
 import joblib
 
 def entrenar_modelo():
@@ -18,7 +18,7 @@ def entrenar_modelo():
     try:
         # Establecemos la conexión usando tus credenciales
         conexion = mysql.connector.connect(
-             host='localhost',
+            host='localhost',
             database='chatbot_siagie_db',
             user='root',
             password='1234'
@@ -35,19 +35,40 @@ def entrenar_modelo():
             print("⚠️ No hay suficientes datos en la BD para entrenar. Asegúrate de tener registros en la vista.")
             return None
 
+        # =========================================================================
+        # [NUEVO] INYECCIÓN DE RUIDO ESTADÍSTICO PARA SIMULAR VARIANZA HUMANA
+        # =========================================================================
+        print("⚙️ Inyectando ruido estadístico para simular un entorno realista...")
+        np.random.seed(42) # Semilla para reproducibilidad
+        
+        # 1. Generamos ruido con distribución normal (media 0, desviación 1.5 puntos)
+        ruido = np.random.normal(loc=0.0, scale=1.5, size=len(df))
+        
+        # 2. Factor externo (Simula un 15% de alumnos con problemas que bajan su nota de -1 a -3 puntos)
+        factor_externo = np.where(np.random.rand(len(df)) < 0.15, 
+                                  np.random.uniform(-3, -1, len(df)), 0)
+        
+        # 3. Alteramos la nota calculada matemáticamente en SQL sumando la varianza
+        df["nota_final"] = df["nota_final"] + ruido + factor_externo
+        
+        # 4. Limitamos matemáticamente para que las notas no salgan del rango peruano (0-20)
+        df["nota_final"] = np.clip(df["nota_final"], 0, 20)
+        df["nota_final"] = np.round(df["nota_final"], 1)
+        # =========================================================================
+
         # Definimos las variables independientes (X) y la variable objetivo (y)
         X = df[['promedio_actual', 'tareas_entregadas', 'tareas_pendientes']]
         y = df['nota_final']
         
-        # [NUEVO] PARTICIÓN DE DATOS: 80% para entrenar, 20% oculto para evaluar
+        # PARTICIÓN DE DATOS: 80% para entrenar, 20% oculto para evaluar
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         
-        # [MODIFICADO] Entrenamos el modelo SOLO con los datos de entrenamiento (X_train)
+        # Entrenamos el modelo SOLO con los datos de entrenamiento (X_train)
         print("⚙️ Entrenando el algoritmo predictivo...")
         modelo = LinearRegression()
         modelo.fit(X_train, y_train)
         
-        # [NUEVO] EVALUACIÓN EXPERIMENTAL SOBRE DATOS NO VISTOS
+        # EVALUACIÓN EXPERIMENTAL SOBRE DATOS NO VISTOS
         y_pred = modelo.predict(X_test)
         
         mae = mean_absolute_error(y_test, y_pred)
@@ -59,7 +80,7 @@ def entrenar_modelo():
         print(f"RMSE (Raíz Error Cuadrático Medio): {rmse:.2f} puntos")
         print(f"R² (Varianza explicada): {r2:.4f}")
         
-        # 1.Definir la carpeta y crearla si no existe
+        # 1. Definir la carpeta y crearla si no existe
         carpeta_modelos = "modelos"
         if not os.path.exists(carpeta_modelos):
             os.makedirs(carpeta_modelos)
@@ -72,21 +93,20 @@ def entrenar_modelo():
         print("\n✅ ¡Modelo predictivo entrenado y guardado exitosamente como 'modelo_notas.pkl'!")
 
         # =========================================================================
-        # [NUEVO] IMPRESIÓN DE COEFICIENTES (PESOS MATEMÁTICOS DEL MODELO)
+        # IMPRESIÓN DE COEFICIENTES (PESOS MATEMÁTICOS DEL MODELO)
         # =========================================================================
         # Cargamos el modelo para verificar lo que se guardó en el disco
         modelo_cargado = joblib.load(ruta_modelo)
         
         # Extraemos los coeficientes (el orden corresponde a las columnas de X)
-        # X = ['promedio_actual', 'tareas_entregadas', 'tareas_pendientes']
         coef_promedio = modelo_cargado.coef_[0]
         coef_tareas_entregadas = modelo_cargado.coef_[1]
         coef_tareas_pendientes = modelo_cargado.coef_[2]
         
         print("\n# Coeficientes aprendidos (verificación con joblib.load):")
         print(f"#   promedio_actual = {coef_promedio:.2f} | tareas_entregadas = {coef_tareas_entregadas:.2f} | tareas_pendientes = {coef_tareas_pendientes:.2f}")
-        print("#   -> el modelo recupera exactamente la ponderación institucional 0.7/0.5")
-        print("#      definida en la vista SQL (dataset_rendimiento)")
+        print("#   -> Los coeficientes ahora variarán ligeramente de la ponderación original 0.7/0.5")
+        print("#      debido a la varianza y el ruido estadístico introducido simulando estudiantes reales.")
 
         return modelo
 
